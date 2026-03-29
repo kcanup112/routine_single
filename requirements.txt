@@ -1,0 +1,95 @@
+# ============================================================================
+# Routine Scheduler - Multi-Tenant SaaS - VPS Deployment Requirements
+# ============================================================================
+# Install Python packages: pip install -r requirements.txt
+# Install Node.js packages: cd frontend && npm install
+# ============================================================================
+
+# ============================================================================
+# PYTHON BACKEND DEPENDENCIES
+# ============================================================================
+
+# Web Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+starlette==0.27.0
+
+# Database ORM
+sqlalchemy==2.0.23
+aiosqlite==0.19.0
+
+# Data Validation
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# CORS and Middleware
+python-multipart==0.0.6
+
+# Environment Variables
+python-dotenv==1.0.0
+
+# Date and Time
+python-dateutil==2.8.2
+
+# Utilities
+typing-extensions==4.8.0
+
+# Production ASGI Server (for VPS deployment)
+gunicorn==21.2.0
+
+# ============================================================================
+# DEPLOYMENT NOTES
+# ============================================================================
+
+# SYSTEM REQUIREMENTS:
+# - Python 3.9 or higher
+# - Node.js 18.x or higher
+# - SQLite 3.x (included with Python)
+# - Nginx (recommended for reverse proxy)
+# - Ubuntu 20.04+ / Debian 11+ / CentOS 8+ (recommended OS)
+
+# INSTALLATION STEPS:
+# 
+# 1. Install Python dependencies:
+#    pip install -r requirements.txt
+#
+# 2. Install Node.js dependencies (frontend):
+#    cd frontend
+#    npm install
+#
+# 3. Build frontend for production:
+#    npm run build
+#
+#
+# 4. Set up environment variables:
+#    Create .env file in backend directory with:
+#    DATABASE_URL=sqlite:///./kec_routine.db
+#    SECRET_KEY=your-secret-key-here
+#    CORS_ORIGINS=https://your-domain.com
+#    HOST=0.0.0.0
+#    PORT=8000
+#
+# 6. Run backend server:
+#    cd backend
+#    python run.py
+#    # Or for production with gunicorn:
+#    gunicorn -w 4 -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:8000
+#
+# 6. Configure Nginx reverse proxy (optional but recommended):
+#    - Backend API: proxy_pass http://localhost:8000
+#    - Frontend: serve built files from frontend/dist
+#
+# 9. Set up SSL certificate (recommended):
+#    sudo certbot --nginx -d your-domain.com
+#
+# 10. Configure systemd services or PM2 for auto-restart
+
+# PORTS USED:
+# - 8000: Backend API (FastAPI/Uvicorn)
+# - 80/443: Nginx reverse proxy (HTTP/HTTPS)
+
+# FIREWALL CONFIGURATION:
+# sudo ufw allow 22/tcp    # SSH
+# sudo ufw allow 80/tcp    # HTTP
+# sudo ufw allow 443/tcp   # HTTPS
+# sudo ufw enable

@@ -1,0 +1,178 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: kec-routine-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: kec_routine_saas
+      POSTGRES_USER: kec_admin
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-kec_routine_2024_secure}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kec_admin -d kec_routine_saas"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kec-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: kec-routine-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_secure_2024}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kec-network
+
+  # PgBouncer (Connection Pooling)
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: kec-routine-pgbouncer
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://kec_admin:${DB_PASSWORD:-kec_routine_2024_secure}@postgres:5432/kec_routine_saas
+      POOL_MODE: session
+      MAX_CLIENT_CONN: 1000
+      DEFAULT_POOL_SIZE: 25
+      MIN_POOL_SIZE: 5
+      RESERVE_POOL_SIZE: 5
+    ports:
+      - "6432:5432"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - kec-network
+
+  # Backend API (FastAPI)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: kec-routine-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Override with container network values
+      DATABASE_URL: postgresql://kec_admin:${DB_PASSWORD:-kec_routine_2024_secure}@postgres:5432/kec_routine_saas
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secure_2024}@redis:6379/0
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - uploads_data:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - kec-network
+    command: uvicorn app.main_saas:app --host 0.0.0.0 --port 8000 --reload
+
+  # Frontend (React + Vite)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: kec-routine-frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: http://localhost:8000
+      VITE_APP_NAME: KEC Routine Scheduler
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - kec-network
+    command: npm run dev -- --host 0.0.0.0 --port 3000
+
+  # Celery Worker (Background Tasks)
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: kec-routine-celery
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://kec_admin:${DB_PASSWORD:-kec_routine_2024_secure}@postgres:5432/kec_routine_saas
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secure_2024}@redis:6379/0
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - kec-network
+    command: celery -A app.celery_app worker --loglevel=info
+
+  # pgAdmin (Database Management UI)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: kec-routine-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@kec.edu.np}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - kec-network
+
+  # Redis Commander (Redis Management UI)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: kec-routine-redis-ui
+    restart: unless-stopped
+    environment:
+      REDIS_HOSTS: local:redis:6379:0:${REDIS_PASSWORD:-redis_secure_2024}
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - kec-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+  uploads_data:
+    driver: local
+
+networks:
+  kec-network:
+    driver: bridge

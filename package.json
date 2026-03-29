@@ -1,0 +1,38 @@
+{
+  "name": "kec-routine-scheduler-electron",
+  "version": "1.0.0",
+  "description": "Routine Scheduler - Multi-Tenant Desktop Application",
+  "main": "electron-main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "build-win": "electron-builder --win --x64"
+  },
+  "build": {
+    "appId": "com.kec.routinescheduler",
+    "productName": "Routine Scheduler",
+    "directories": {
+      "output": "electron-dist"
+    },
+    "files": [
+      "electron-main.js",
+      "frontend/dist/**/*",
+      "backend/dist/KEC_Routine_Backend/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  },
+  "devDependencies": {
+    "electron": "^27.0.0",
+    "electron-builder": "^24.6.4"
+  },
+  "dependencies": {}
+}
