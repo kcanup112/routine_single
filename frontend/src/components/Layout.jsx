@@ -53,6 +53,7 @@ import {
   AdminPanelSettings as AdminIcon,
   Business,
   MeetingRoom as RoomIcon,
+  AccountTree as HierarchyIcon,
 } from '@mui/icons-material'
 
 const drawerWidth = 240
@@ -86,6 +87,7 @@ const menuSections = [
     items: [
       { text: 'Class Routine', icon: <ClassRoutineIcon />, path: '/dashboard/class-routine' },
       { text: 'Teacher Routine', icon: <TeacherRoutineIcon />, path: '/dashboard/teacher-routine' },
+      { text: 'Academic Hierarchy', icon: <HierarchyIcon />, path: '/dashboard/academic-hierarchy' },
     ]
   },
 ]

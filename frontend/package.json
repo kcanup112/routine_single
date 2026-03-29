@@ -10,12 +10,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@dagrejs/dagre": "^3.0.0",
     "@emotion/react": "^11.11.1",
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.14.19",
     "@mui/material": "^5.14.19",
     "@mui/x-data-grid": "^6.18.3",
     "@mui/x-date-pickers": "^6.20.2",
+    "@xyflow/react": "^12.10.2",
     "axios": "^1.6.2",
     "date-fns": "^2.30.0",
     "nepali-date-converter": "^3.2.1",

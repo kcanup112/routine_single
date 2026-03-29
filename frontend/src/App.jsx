@@ -27,6 +27,7 @@ import TeacherRoutine from './pages/TeacherRoutine'
 import Finance from './pages/Finance'
 import UserManagement from './pages/UserManagement'
 import AcademicCalendar from './pages/AcademicCalendar'
+import AcademicHierarchy from './pages/AcademicHierarchy'
 import SystemDashboard from './pages/admin/SystemDashboard'
 import TenantList from './pages/admin/TenantList'
 import { useEffect } from 'react'
@@ -114,6 +115,11 @@ function App() {
               <Route path="finance" element={
                 <ProtectedRoute roles={['super_admin', 'admin']}>
                   <Finance />
+                </ProtectedRoute>
+              } />
+              <Route path="academic-hierarchy" element={
+                <ProtectedRoute roles={['super_admin', 'admin']}>
+                  <AcademicHierarchy />
                 </ProtectedRoute>
               } />
               
