@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import {
   ReactFlow,
   Controls,
@@ -39,8 +39,9 @@ import SchoolIcon from '@mui/icons-material/School'
 import MenuBookIcon from '@mui/icons-material/MenuBook'
 import PersonIcon from '@mui/icons-material/Person'
 import GroupsIcon from '@mui/icons-material/Groups'
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh'
 import { hierarchyService } from '../services/hierarchyService'
-import { semesterSubjectService, teacherSubjectService, semesterService, classService, subjectService, teacherService } from '../services/index'
+import { semesterSubjectService, teacherSubjectService, semesterService, classService, subjectService, teacherService, classRoutineService } from '../services/index'
 import { buildFlowGraph } from '../utils/buildFlowGraph'
 import { getLayoutedElements } from '../utils/dagreLayout'
 import SemesterNode from '../components/flow/SemesterNode'
@@ -117,6 +118,7 @@ export default function AcademicHierarchy() {
   const [availableItems, setAvailableItems] = useState([])
   const [addNodeMenuAnchor, setAddNodeMenuAnchor] = useState(null)
   const [loadingItems, setLoadingItems] = useState(false)
+  const [generating, setGenerating] = useState(false)
 
   // Right-click context menu
   const [contextMenu, setContextMenu] = useState(null)
@@ -131,6 +133,16 @@ export default function AcademicHierarchy() {
   // Snackbar
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' })
   const toast = useCallback((message, severity = 'success') => setSnackbar({ open: true, message, severity }), [])
+
+  // E-key held -> click edge to delete
+  const eKeyHeld = useRef(false)
+  useEffect(() => {
+    const onDown = (ev) => { if (ev.key === 'e' || ev.key === 'E') eKeyHeld.current = true }
+    const onUp   = (ev) => { if (ev.key === 'e' || ev.key === 'E') eKeyHeld.current = false }
+    window.addEventListener('keydown', onDown)
+    window.addEventListener('keyup',   onUp)
+    return () => { window.removeEventListener('keydown', onDown); window.removeEventListener('keyup', onUp) }
+  }, [])
 
   const loadData = useCallback(async (programmeId = null) => {
     setLoading(true)
@@ -265,6 +277,13 @@ export default function AcademicHierarchy() {
     }
   }, [nodes, toast])
 
+  // -- E + click edge -> delete it -------------------------------------
+  const onEdgeClick = useCallback((_event, edge) => {
+    if (!eKeyHeld.current) return
+    onEdgesDelete([edge])
+    setEdges((eds) => eds.filter((e) => e.id !== edge.id))
+  }, [onEdgesDelete, setEdges])
+
   // -- Delete node -> remove all its DB relationships -------------------
   const onNodesDelete = useCallback(async (deletedNodes) => {
     for (const node of deletedNodes) {
@@ -351,6 +370,71 @@ export default function AcademicHierarchy() {
     toast('Teacher assigned')
   }
 
+  // -- Generate Routine from canvas hierarchy ---------------------------
+  const handleGenerateRoutine = useCallback(async () => {
+    const LOAD_STORAGE_KEY = 'kec_teacher_loads'
+    let storedLoads = {}
+    try { storedLoads = JSON.parse(localStorage.getItem(LOAD_STORAGE_KEY) || '{}') } catch {}
+
+    // Find all class nodes on canvas
+    const classNodes = nodes.filter((n) => n.type === 'class')
+    if (classNodes.length === 0) {
+      toast('No class nodes on canvas', 'warning')
+      return
+    }
+
+    // Build assignment payload from canvas edges
+    const assignments = classNodes.map((clsNode) => {
+      const classId = parseNodeId(clsNode.id).classId
+
+      // Find subject nodes connected to this class
+      const subjectEdges = edges.filter((e) => e.source === clsNode.id)
+      const subjects = subjectEdges.map((se) => {
+        const subNode = nodes.find((n) => n.id === se.target && n.type === 'subject')
+        if (!subNode) return null
+        const { subjectId } = parseNodeId(subNode.id)
+
+        // Find teacher nodes connected to this subject
+        const teacherEdges = edges.filter((e) => e.source === subNode.id)
+        const teachers = teacherEdges.map((te) => {
+          const tNode = nodes.find((n) => n.id === te.target && n.type === 'teacher')
+          if (!tNode) return null
+          const { teacherId } = parseNodeId(tNode.id)
+          const load = parseFloat(tNode.data?.load ?? storedLoads[tNode.id] ?? 0) || 0
+          return { teacher_id: teacherId, load: Math.round(load) }
+        }).filter(Boolean)
+
+        return { subject_id: subjectId, teachers }
+      }).filter(Boolean)
+
+      return { class_id: classId, subjects }
+    })
+
+    // Remove classes with no subjects
+    const payload = assignments.filter((a) => a.subjects.length > 0)
+    if (payload.length === 0) {
+      toast('No subject-teacher connections found on canvas', 'warning')
+      return
+    }
+
+    setGenerating(true)
+    try {
+      const res = await classRoutineService.generate(payload)
+      const { placed, unplaced, class_results, error } = res.data
+      if (error) { toast(error, 'error'); return }
+      const unplacedCount = unplaced?.length ?? 0
+      if (unplacedCount > 0) {
+        toast(`Generated ${placed} periods. ${unplacedCount} slot(s) could not be placed — timetable may be full.`, 'warning')
+      } else {
+        toast(`Routine generated: ${placed} periods across ${class_results?.length} class(es)`)
+      }
+    } catch (e) {
+      toast(e?.response?.data?.detail || 'Failed to generate routine', 'error')
+    } finally {
+      setGenerating(false)
+    }
+  }, [nodes, edges, toast])
+
   const handleRemoveConfirm = async () => {
     const { node, parsed } = dialogTarget
     const relatedEdges = edges.filter((e) => e.source === node.id || e.target === node.id)
@@ -403,7 +487,7 @@ export default function AcademicHierarchy() {
           <Box>
             <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>Academic Hierarchy</Typography>
             <Typography variant="body2" sx={{ color: '#64748b' }}>
-              Right-click Class to add Subjects • Right-click Subject to add Teachers • Delete key removes selected
+              Drag to select nodes • Right-click Class/Subject to add • Hold E + click connector to delete it
             </Typography>
           </Box>
         </Box>
@@ -438,11 +522,14 @@ export default function AcademicHierarchy() {
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            onEdgeClick={onEdgeClick}
             onEdgesDelete={onEdgesDelete}
             onNodesDelete={onNodesDelete}
             onNodeContextMenu={onNodeContextMenu}
             nodeTypes={nodeTypes}
             deleteKeyCode={['Backspace', 'Delete']}
+            selectionOnDrag
+            panOnDrag={[1, 2]}
             fitView
             fitViewOptions={{ padding: 0.2 }}
             minZoom={0.1}
@@ -482,6 +569,17 @@ export default function AcademicHierarchy() {
                     sx={{ borderColor: '#2e7d32', color: '#2e7d32', fontSize: '0.75rem', textTransform: 'none', justifyContent: 'flex-start', '&:hover': { bgcolor: '#e8f5e9' } }}>
                     + Teacher
                   </Button>
+                </Tooltip>
+                <Divider sx={{ my: 0.25 }} />
+                <Tooltip title="Auto-generate theory routine from canvas assignments" placement="right">
+                  <span>
+                    <Button size="small" variant="contained" startIcon={generating ? <CircularProgress size={14} sx={{ color: '#fff' }} /> : <AutoFixHighIcon />}
+                      onClick={handleGenerateRoutine}
+                      disabled={generating}
+                      sx={{ bgcolor: '#6366f1', fontSize: '0.75rem', textTransform: 'none', justifyContent: 'flex-start', '&:hover': { bgcolor: '#4f46e5' } }}>
+                      {generating ? 'Generating…' : 'Generate Routine'}
+                    </Button>
+                  </span>
                 </Tooltip>
               </Paper>
             </Panel>

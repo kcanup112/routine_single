@@ -908,6 +908,276 @@ class ClassRoutineService:
         return {'has_conflict': False, 'conflicts': []}
 
 
+class RoutineGeneratorService:
+    """
+    Auto-generate theory-only routine entries for a list of classes.
+
+    Block-size rules (consecutive pairs prioritised):
+      load=1 → [1]
+      load=2 → [2]
+      load=3 → [2, 1]
+      load=4 → [2, 2]
+      load=5 → [2, 2, 1]
+      load=N → [2, …, 2, (1 if N is odd)]
+    """
+
+    @staticmethod
+    def _plan_blocks(load: int) -> list:
+        blocks = []
+        remaining = int(load)
+        while remaining >= 2:
+            blocks.append(2)
+            remaining -= 2
+        if remaining:
+            blocks.append(1)
+        return blocks
+
+    @staticmethod
+    def generate(db, assignments: list) -> dict:
+        from collections import defaultdict
+
+        # 1. Working days ordered by day_number
+        days = (db.query(models.Day)
+                  .filter(models.Day.is_working_day == True)
+                  .order_by(models.Day.day_number)
+                  .all())
+        if not days:
+            return {'placed': 0, 'unplaced': [], 'class_results': [],
+                    'error': 'No working days configured'}
+
+        # 2. All active teaching periods
+        all_periods_db = (db.query(models.Period)
+                            .filter(models.Period.is_teaching_period == True,
+                                    models.Period.is_active == True)
+                            .order_by(models.Period.period_number)
+                            .all())
+        period_number_map = {p.id: p.period_number for p in all_periods_db}
+
+        # 3. Pre-build busy maps from ALL existing entries (theory + lab)
+        all_existing = db.query(models.ClassRoutineEntry).all()
+        teacher_busy = defaultdict(set)
+        class_busy   = defaultdict(set)
+
+        for entry in all_existing:
+            pn = period_number_map.get(entry.period_id)
+            if pn is None:
+                continue
+            for offset in range(entry.num_periods or 1):
+                slot = (entry.day_id, pn + offset)
+                class_busy[entry.class_id].add(slot)
+                for tid in [entry.lead_teacher_id,
+                            entry.assist_teacher_1_id,
+                            entry.assist_teacher_2_id,
+                            entry.assist_teacher_3_id]:
+                    if tid:
+                        teacher_busy[tid].add(slot)
+
+        # 4. Collect IDs of classes to regenerate
+        class_ids = [ca['class_id'] for ca in assignments]
+
+        # 5. Delete only existing THEORY entries for these classes
+        #    Reset class_busy to only lab slots; remove deleted theory from teacher_busy
+        lab_slots_by_class = defaultdict(set)
+        for entry in all_existing:
+            if entry.class_id in class_ids and entry.is_lab:
+                pn = period_number_map.get(entry.period_id)
+                if pn is None:
+                    continue
+                for offset in range(entry.num_periods or 1):
+                    lab_slots_by_class[entry.class_id].add((entry.day_id, pn + offset))
+
+        for cid in class_ids:
+            db.query(models.ClassRoutineEntry).filter(
+                models.ClassRoutineEntry.class_id == cid,
+                models.ClassRoutineEntry.is_lab == False,
+            ).delete()
+            class_busy[cid] = lab_slots_by_class[cid].copy()
+
+        for entry in all_existing:
+            if entry.class_id in class_ids and not entry.is_lab:
+                pn = period_number_map.get(entry.period_id)
+                if pn is None:
+                    continue
+                for offset in range(entry.num_periods or 1):
+                    slot = (entry.day_id, pn + offset)
+                    for tid in [entry.lead_teacher_id,
+                                entry.assist_teacher_1_id,
+                                entry.assist_teacher_2_id,
+                                entry.assist_teacher_3_id]:
+                        if tid:
+                            teacher_busy[tid].discard(slot)
+
+        # 6. Process each class
+        total_placed  = 0
+        unplaced      = []
+        class_results = []
+        new_entries   = []
+
+        for ca in assignments:
+            class_id = ca['class_id']
+            cls = db.query(models.Class).filter(models.Class.id == class_id).first()
+            if not cls:
+                continue
+
+            if cls.shift_id:
+                shift_periods = (db.query(models.Period)
+                                   .filter(models.Period.shift_id == cls.shift_id,
+                                           models.Period.is_teaching_period == True,
+                                           models.Period.is_active == True)
+                                   .order_by(models.Period.period_number)
+                                   .all())
+            else:
+                shift_periods = all_periods_db
+
+            pnums = [p.period_number for p in shift_periods]
+            pid_by_pnum = {p.period_number: p.id for p in shift_periods}
+
+            adjacent_pairs = [
+                (pnums[i], pnums[i + 1])
+                for i in range(len(pnums) - 1)
+                if pnums[i + 1] == pnums[i] + 1
+            ]
+
+            class_placed   = 0
+            class_unplaced = []
+
+            # Deduplicate: only process each (subject, teacher) once per class
+            seen_pairs = set()
+
+            for subj in ca.get('subjects', []):
+                subject_id = subj['subject_id']
+                for tl in subj.get('teachers', []):
+                    teacher_id = tl['teacher_id']
+                    pair_key = (subject_id, teacher_id)
+                    if pair_key in seen_pairs:
+                        continue
+                    seen_pairs.add(pair_key)
+
+                    load = max(0, int(tl.get('load', 0) or 0))
+                    if load == 0:
+                        continue
+
+                    blocks = RoutineGeneratorService._plan_blocks(load)
+                    subject_placed = 0
+
+                    for block_size in blocks:
+                        placed_this_block = False
+
+                        if block_size == 2:
+                            # Try adjacent pair first
+                            for day in days:
+                                if placed_this_block:
+                                    break
+                                for pn1, pn2 in adjacent_pairs:
+                                    s1 = (day.id, pn1)
+                                    s2 = (day.id, pn2)
+                                    if (s1 not in class_busy[class_id] and
+                                            s2 not in class_busy[class_id] and
+                                            s1 not in teacher_busy[teacher_id] and
+                                            s2 not in teacher_busy[teacher_id]):
+                                        new_entries.append(models.ClassRoutineEntry(
+                                            class_id=class_id,
+                                            day_id=day.id,
+                                            period_id=pid_by_pnum[pn1],
+                                            subject_id=subject_id,
+                                            lead_teacher_id=teacher_id,
+                                            num_periods=2,
+                                            is_lab=False,
+                                        ))
+                                        class_busy[class_id].add(s1)
+                                        class_busy[class_id].add(s2)
+                                        teacher_busy[teacher_id].add(s1)
+                                        teacher_busy[teacher_id].add(s2)
+                                        subject_placed += 2
+                                        placed_this_block = True
+                                        break
+
+                            # Fallback: two singles
+                            if not placed_this_block:
+                                singles = 0
+                                for day in days:
+                                    if singles >= 2:
+                                        break
+                                    for pn in pnums:
+                                        s = (day.id, pn)
+                                        if (s not in class_busy[class_id] and
+                                                s not in teacher_busy[teacher_id]):
+                                            new_entries.append(models.ClassRoutineEntry(
+                                                class_id=class_id,
+                                                day_id=day.id,
+                                                period_id=pid_by_pnum[pn],
+                                                subject_id=subject_id,
+                                                lead_teacher_id=teacher_id,
+                                                num_periods=1,
+                                                is_lab=False,
+                                            ))
+                                            class_busy[class_id].add(s)
+                                            teacher_busy[teacher_id].add(s)
+                                            subject_placed += 1
+                                            singles += 1
+                                            placed_this_block = True
+                                            break
+                        else:
+                            for day in days:
+                                if placed_this_block:
+                                    break
+                                for pn in pnums:
+                                    s = (day.id, pn)
+                                    if (s not in class_busy[class_id] and
+                                            s not in teacher_busy[teacher_id]):
+                                        new_entries.append(models.ClassRoutineEntry(
+                                            class_id=class_id,
+                                            day_id=day.id,
+                                            period_id=pid_by_pnum[pn],
+                                            subject_id=subject_id,
+                                            lead_teacher_id=teacher_id,
+                                            num_periods=1,
+                                            is_lab=False,
+                                        ))
+                                        class_busy[class_id].add(s)
+                                        teacher_busy[teacher_id].add(s)
+                                        subject_placed += 1
+                                        placed_this_block = True
+                                        break
+
+                        if not placed_this_block:
+                            class_unplaced.append({
+                                'subject_id': subject_id,
+                                'teacher_id': teacher_id,
+                                'block_size': block_size,
+                                'reason': 'No free slot found',
+                            })
+
+                    class_placed += subject_placed
+                    if subject_placed < load:
+                        class_unplaced.append({
+                            'subject_id': subject_id,
+                            'teacher_id': teacher_id,
+                            'load': load,
+                            'placed': subject_placed,
+                            'reason': f'Only placed {subject_placed}/{load} periods',
+                        })
+
+            total_placed += class_placed
+            unplaced.extend(class_unplaced)
+            class_results.append({
+                'class_id': class_id,
+                'placed': class_placed,
+                'unplaced': len(class_unplaced),
+            })
+
+        # 7. Bulk write
+        for entry in new_entries:
+            db.add(entry)
+        db.commit()
+
+        return {
+            'placed': total_placed,
+            'unplaced': unplaced,
+            'class_results': class_results,
+        }
+
+
 # Position Rate CRUD operations
 def get_position_rates(db: Session):
     """Get all position rates"""

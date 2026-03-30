@@ -120,6 +120,7 @@ export const classRoutineService = {
       period_ids: periodIds,
       exclude_class_id: excludeClassId
     }),
+  generate: (assignments) => api.post('/class-routines/generate/', { assignments }),
 }
 
 export { calendarService } from './calendarService'

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.core.database_saas import get_db
-from app.services.crud import ClassRoutineService
+from app.services.crud import ClassRoutineService, RoutineGeneratorService
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/class-routines", tags=["class-routines"])
@@ -33,6 +33,21 @@ class TeacherConflictRequest(BaseModel):
     day_id: int
     period_ids: List[int]
     exclude_class_id: Optional[int] = None
+
+class TeacherLoad(BaseModel):
+    teacher_id: int
+    load: int
+
+class SubjectAssignment(BaseModel):
+    subject_id: int
+    teachers: List[TeacherLoad]
+
+class ClassAssignment(BaseModel):
+    class_id: int
+    subjects: List[SubjectAssignment]
+
+class GenerateRequest(BaseModel):
+    assignments: List[ClassAssignment]
 
 @router.post("/save/")
 def save_routine(request: RoutineSaveRequest, db: Session = Depends(get_db)):
@@ -73,3 +88,17 @@ def check_teacher_conflict(
         db, request.teacher_id, request.day_id, request.period_ids, request.exclude_class_id
     )
     return result
+
+@router.post("/generate/")
+def generate_routine(request: GenerateRequest, db: Session = Depends(get_db)):
+    """
+    Auto-generate theory routine entries for the given class-subject-teacher assignments.
+    Prioritises consecutive 2-period blocks. Skips slots occupied by labs or other classes.
+    """
+    try:
+        result = RoutineGeneratorService.generate(
+            db, [a.dict() for a in request.assignments]
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
