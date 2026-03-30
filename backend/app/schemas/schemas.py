@@ -44,14 +44,14 @@ class Programme(ProgrammeBase):
 class SemesterBase(BaseModel):
     name: str
     semester_number: int
-    programme_id: int
+    programme_id: Optional[int] = None
     academic_year: Optional[str] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     is_active: bool = True
 
 class SemesterCreate(SemesterBase):
-    pass
+    programme_id: int
 
 class SemesterUpdate(SemesterBase):
     name: Optional[str] = None
@@ -75,7 +75,7 @@ class ClassBase(BaseModel):
     name: str
     section: Optional[str] = None
     room_no: Optional[str] = None
-    semester_id: int
+    semester_id: Optional[int] = None
     shift_id: Optional[int] = None
     department_id: Optional[int] = None
     student_capacity: int = 60
@@ -85,7 +85,7 @@ class ClassBase(BaseModel):
     effective_date: Optional[date] = None
 
 class ClassCreate(ClassBase):
-    pass
+    semester_id: int
 
 class ClassUpdate(BaseModel):
     name: Optional[str] = None

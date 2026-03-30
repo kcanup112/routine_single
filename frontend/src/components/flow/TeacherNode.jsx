@@ -1,7 +1,18 @@
-import { Handle, Position } from '@xyflow/react'
-import { Box, Typography, Avatar } from '@mui/material'
+import { useState } from 'react'
+import { Handle, Position, useReactFlow } from '@xyflow/react'
+import { Box, Typography, Avatar, TextField } from '@mui/material'
 
-export default function TeacherNode({ data }) {
+const LOAD_STORAGE_KEY = 'kec_teacher_loads'
+function getStoredLoads() {
+  try { return JSON.parse(localStorage.getItem(LOAD_STORAGE_KEY) || '{}') } catch { return {} }
+}
+
+export default function TeacherNode({ id, data }) {
+  const { updateNodeData } = useReactFlow()
+  const [load, setLoad] = useState(() => {
+    if (data.load !== '' && data.load != null) return data.load
+    return getStoredLoads()[id] ?? ''
+  })
   const teacher = data.teacher || {}
   const initials = (teacher.name || '')
     .split(' ')
@@ -62,6 +73,34 @@ export default function TeacherNode({ data }) {
             ({teacher.abbreviation})
           </Typography>
         )}
+        <TextField
+          label="Load"
+          size="small"
+          type="number"
+          value={load}
+          onChange={(e) => setLoad(e.target.value)}
+          onBlur={() => {
+            const val = parseFloat(load) || 0
+            updateNodeData(id, { load: val })
+            const loads = getStoredLoads()
+            loads[id] = val
+            localStorage.setItem(LOAD_STORAGE_KEY, JSON.stringify(loads))
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className="nodrag nopan"
+          inputProps={{ min: 0, max: 999, step: 0.5 }}
+          sx={{
+            mt: 0.75,
+            width: '100%',
+            '& .MuiInputBase-input': { fontSize: '0.7rem', py: 0.4, px: 0.75 },
+            '& .MuiInputLabel-root': { fontSize: '0.65rem' },
+            '& .MuiOutlinedInput-root': {
+              bgcolor: '#fff',
+              '& fieldset': { borderColor: '#a5d6a7' },
+              '&:hover fieldset': { borderColor: '#66bb6a' },
+            },
+          }}
+        />
       </Box>
     </Box>
   )

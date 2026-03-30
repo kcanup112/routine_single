@@ -38,7 +38,10 @@ export default function SubjectNode({ data }) {
           )}
         </Box>
       </Box>
-      <Handle type="source" position={Position.Bottom} style={{ background: '#90caf9' }} />
+      {/* 3 source handles spread across the bottom */}
+      <Handle type="source" id="src-a" position={Position.Bottom} style={{ background: '#90caf9', left: '20%' }} />
+      <Handle type="source" id="src-b" position={Position.Bottom} style={{ background: '#90caf9', left: '50%' }} />
+      <Handle type="source" id="src-c" position={Position.Bottom} style={{ background: '#90caf9', left: '80%' }} />
     </Box>
   )
 }

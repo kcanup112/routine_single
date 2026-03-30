@@ -38,17 +38,20 @@ import PersonRemoveIcon from '@mui/icons-material/PersonRemove'
 import SchoolIcon from '@mui/icons-material/School'
 import MenuBookIcon from '@mui/icons-material/MenuBook'
 import PersonIcon from '@mui/icons-material/Person'
+import GroupsIcon from '@mui/icons-material/Groups'
 import { hierarchyService } from '../services/hierarchyService'
-import { semesterSubjectService, teacherSubjectService, semesterService, subjectService, teacherService } from '../services/index'
+import { semesterSubjectService, teacherSubjectService, semesterService, subjectService, teacherService, classService } from '../services/index'
 import { buildFlowGraph } from '../utils/buildFlowGraph'
 import { getLayoutedElements } from '../utils/dagreLayout'
 import SemesterNode from '../components/flow/SemesterNode'
 import SubjectNode from '../components/flow/SubjectNode'
 import TeacherNode from '../components/flow/TeacherNode'
+import ClassNode from '../components/flow/ClassNode'
 import { ConfirmRemoveDialog } from '../components/flow/HierarchyDialogs'
 
 const nodeTypes = {
   semester: SemesterNode,
+  class: ClassNode,
   subject: SubjectNode,
   teacher: TeacherNode,
 }
@@ -62,36 +65,37 @@ const EDGE_DEFAULTS = {
 
 const miniMapNodeColor = (node) => {
   switch (node.type) {
-    case 'semester':
-      return '#1e3a5f'
-    case 'subject':
-      return '#42a5f5'
-    case 'teacher':
-      return '#66bb6a'
-    default:
-      return '#ccc'
+    case 'semester': return '#1e3a5f'
+    case 'class':    return '#9c27b0'
+    case 'subject':  return '#42a5f5'
+    case 'teacher':  return '#66bb6a'
+    default:         return '#ccc'
   }
 }
 
-// Parse flat node IDs: sem-{id}, sub-{id}, teacher-{id}
+// Parse flat node IDs: sem-{id}, cls-{id}, sub-{id}, teacher-{id}
 function parseNodeId(nodeId) {
+  if (!nodeId) return {}
   const parts = nodeId.split('-')
-  if (parts[0] === 'sem') return { type: 'semester', semesterId: parseInt(parts[1]) }
-  if (parts[0] === 'sub') return { type: 'subject', subjectId: parseInt(parts[1]) }
-  if (parts[0] === 'teacher') return { type: 'teacher', teacherId: parseInt(parts[1]) }
+  if (parts[0] === 'sem')     return { type: 'semester', semesterId: parseInt(parts[1]) }
+  if (parts[0] === 'cls')     return { type: 'class',    classId:    parseInt(parts[1]) }
+  if (parts[0] === 'sub')     return { type: 'subject',  subjectId:  parseInt(parts[1]) }
+  if (parts[0] === 'teacher') return { type: 'teacher',  teacherId:  parseInt(parts[1]) }
   return {}
 }
 
-// Parse edge IDs: e-sem-{semId}-sub-{subId} or e-sub-{subId}-teacher-{teacherId}
+// Parse edge IDs
 function parseEdgeId(edgeId) {
-  if (edgeId.startsWith('e-sem-')) {
-    const m = edgeId.match(/^e-sem-(\d+)-sub-(\d+)$/)
-    if (m) return { type: 'semester-subject', semesterId: parseInt(m[1]), subjectId: parseInt(m[2]) }
-  }
-  if (edgeId.startsWith('e-sub-')) {
-    const m = edgeId.match(/^e-sub-(\d+)-teacher-(\d+)$/)
-    if (m) return { type: 'subject-teacher', subjectId: parseInt(m[1]), teacherId: parseInt(m[2]) }
-  }
+  if (!edgeId) return {}
+  let m
+  m = edgeId.match(/^e-sem-(\d+)-cls-(\d+)$/);
+  if (m) return { type: 'semester-class',   semesterId: parseInt(m[1]), classId:   parseInt(m[2]) }
+  m = edgeId.match(/^e-sem-(\d+)-sub-(\d+)$/);
+  if (m) return { type: 'semester-subject', semesterId: parseInt(m[1]), subjectId: parseInt(m[2]) }
+  m = edgeId.match(/^e-cls-(\d+)-sub-(\d+)$/);
+  if (m) return { type: 'class-subject',    classId:    parseInt(m[1]), subjectId: parseInt(m[2]) }
+  m = edgeId.match(/^e-sub-(\d+)-teacher-(\d+)$/);
+  if (m) return { type: 'subject-teacher',  subjectId:  parseInt(m[1]), teacherId: parseInt(m[2]) }
   return {}
 }
 
@@ -118,7 +122,7 @@ export default function AcademicHierarchy() {
 
   // Snackbar
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' })
-  const toast = (message, severity = 'success') => setSnackbar({ open: true, message, severity })
+  const toast = useCallback((message, severity = 'success') => setSnackbar({ open: true, message, severity }), [])
 
   const loadData = useCallback(async (programmeId = null) => {
     setLoading(true)
@@ -190,10 +194,12 @@ export default function AcademicHierarchy() {
     let newNode
     if (addNodeType === 'semester') {
       newNode = { id: `sem-${item.id}`, type: 'semester', data: { label: item.name, semester: item }, position: { x: 100 + Math.random() * 200, y: 100 + Math.random() * 100 } }
+    } else if (addNodeType === 'class') {
+      newNode = { id: `cls-${item.id}`, type: 'class', data: { label: item.name, section: item.section, classObj: item }, position: { x: 100 + Math.random() * 300, y: 200 + Math.random() * 100 } }
     } else if (addNodeType === 'subject') {
-      newNode = { id: `sub-${item.id}`, type: 'subject', data: { label: item.name, subject: item }, position: { x: 100 + Math.random() * 300, y: 200 + Math.random() * 100 } }
+      newNode = { id: `sub-${item.id}`, type: 'subject', data: { label: item.name, subject: item }, position: { x: 100 + Math.random() * 300, y: 300 + Math.random() * 100 } }
     } else if (addNodeType === 'teacher') {
-      newNode = { id: `teacher-${item.id}`, type: 'teacher', data: { label: item.name, teacher: item }, position: { x: 100 + Math.random() * 300, y: 350 + Math.random() * 100 } }
+      newNode = { id: `teacher-${item.id}`, type: 'teacher', data: { label: item.name, teacher: item }, position: { x: 100 + Math.random() * 300, y: 400 + Math.random() * 100 } }
     }
     if (newNode) setNodes((nds) => [...nds, newNode])
   }
@@ -245,35 +251,43 @@ export default function AcademicHierarchy() {
         if (parsed.type === 'semester-subject') {
           await semesterSubjectService.removeSubject(parsed.semesterId, parsed.subjectId)
           toast('Subject removed from semester')
+        } else if (parsed.type === 'class-subject') {
+          const classNode = nodes.find((n) => n.id === `cls-${parsed.classId}`)
+          const semesterId = classNode?.data?.classObj?.semester_id
+          if (semesterId) await semesterSubjectService.removeSubject(semesterId, parsed.subjectId)
+          toast('Subject removed from class')
         } else if (parsed.type === 'subject-teacher') {
           await teacherSubjectService.removeSubject(parsed.teacherId, parsed.subjectId)
           toast('Teacher removed from subject')
         }
+        // semester-class edges: no DB removal (class.semester_id is set in class record)
       } catch (e) {
         toast(e?.response?.data?.detail || 'Failed to remove connection', 'error')
       }
     }
-  }, [])
+  }, [nodes, toast])
 
   // â”€â”€ Delete node â†’ remove all its DB relationships â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const onNodesDelete = useCallback(async (deletedNodes) => {
     for (const node of deletedNodes) {
-      const parsed = parseNodeId(node.id)
-      // Find all edges connected to this node in the current graph
       const relatedEdges = edges.filter((e) => e.source === node.id || e.target === node.id)
       for (const edge of relatedEdges) {
         const ep = parseEdgeId(edge.id)
         try {
           if (ep.type === 'semester-subject') {
             await semesterSubjectService.removeSubject(ep.semesterId, ep.subjectId)
+          } else if (ep.type === 'class-subject') {
+            const classNode = nodes.find((n) => n.id === `cls-${ep.classId}`)
+            const semesterId = classNode?.data?.classObj?.semester_id
+            if (semesterId) await semesterSubjectService.removeSubject(semesterId, ep.subjectId)
           } else if (ep.type === 'subject-teacher') {
             await teacherSubjectService.removeSubject(ep.teacherId, ep.subjectId)
           }
         } catch {}
       }
-      if (parsed.type) toast(`${node.data.label} removed from canvas`)
+      toast(`${node.data.label} removed from canvas`)
     }
-  }, [edges])
+  }, [edges, nodes, toast])
 
   // â”€â”€ Right-click context menu â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const onNodeContextMenu = useCallback((event, node) => {
@@ -299,13 +313,17 @@ export default function AcademicHierarchy() {
   }
 
   const handleRemoveConfirm = async () => {
-    const { node, parsed } = dialogTarget
+    const { node } = dialogTarget
     const relatedEdges = edges.filter((e) => e.source === node.id || e.target === node.id)
     for (const edge of relatedEdges) {
       const ep = parseEdgeId(edge.id)
       try {
         if (ep.type === 'semester-subject') await semesterSubjectService.removeSubject(ep.semesterId, ep.subjectId)
-        else if (ep.type === 'subject-teacher') await teacherSubjectService.removeSubject(ep.teacherId, ep.subjectId)
+        else if (ep.type === 'class-subject') {
+          const classNode = nodes.find((n) => n.id === `cls-${ep.classId}`)
+          const semesterId = classNode?.data?.classObj?.semester_id
+          if (semesterId) await semesterSubjectService.removeSubject(semesterId, ep.subjectId)
+        } else if (ep.type === 'subject-teacher') await teacherSubjectService.removeSubject(ep.teacherId, ep.subjectId)
       } catch {}
     }
     setNodes((nds) => nds.filter((n) => n.id !== node.id))
@@ -315,6 +333,7 @@ export default function AcademicHierarchy() {
 
   const stats = useMemo(() => ({
     semCount: nodes.filter((n) => n.type === 'semester').length,
+    clsCount: nodes.filter((n) => n.type === 'class').length,
     subCount: nodes.filter((n) => n.type === 'subject').length,
     teacherCount: nodes.filter((n) => n.type === 'teacher').length,
   }), [nodes])
@@ -334,6 +353,7 @@ export default function AcademicHierarchy() {
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
           <Chip label={`${stats.semCount} Semesters`} size="small" sx={{ bgcolor: '#1e3a5f', color: '#fff' }} />
+          <Chip label={`${stats.clsCount} Classes`} size="small" sx={{ bgcolor: '#f3e5f5', color: '#6a1b9a' }} />
           <Chip label={`${stats.subCount} Subjects`} size="small" sx={{ bgcolor: '#e3f2fd', color: '#1565c0' }} />
           <Chip label={`${stats.teacherCount} Teachers`} size="small" sx={{ bgcolor: '#e8f5e9', color: '#2e7d32' }} />
           <FormControl size="small" sx={{ minWidth: 200 }}>
@@ -384,6 +404,13 @@ export default function AcademicHierarchy() {
                     onClick={(e) => openAddNodeMenu(e, 'semester')}
                     sx={{ borderColor: '#1e3a5f', color: '#1e3a5f', fontSize: '0.75rem', textTransform: 'none', '&:hover': { bgcolor: '#e8eaf6' } }}>
                     + Semester
+                  </Button>
+                </Tooltip>
+                <Tooltip title="Add Class node">
+                  <Button size="small" variant="outlined" startIcon={<GroupsIcon />}
+                    onClick={(e) => openAddNodeMenu(e, 'class')}
+                    sx={{ borderColor: '#7b1fa2', color: '#7b1fa2', fontSize: '0.75rem', textTransform: 'none', '&:hover': { bgcolor: '#f3e5f5' } }}>
+                    + Class
                   </Button>
                 </Tooltip>
                 <Tooltip title="Add Subject node">

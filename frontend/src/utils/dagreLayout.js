@@ -2,9 +2,9 @@ import Dagre from '@dagrejs/dagre'
 
 const NODE_DIMENSIONS = {
   semester: { width: 220, height: 60 },
+  class: { width: 180, height: 55 },
   subject: { width: 200, height: 55 },
-  classType: { width: 160, height: 40 },
-  teacher: { width: 200, height: 55 },
+  teacher: { width: 200, height: 80 },
 }
 
 export function getLayoutedElements(nodes, edges, direction = 'TB') {
