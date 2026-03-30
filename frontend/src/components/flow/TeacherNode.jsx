@@ -26,6 +26,7 @@ export default function TeacherNode({ data }) {
       }}
     >
       <Handle type="target" position={Position.Top} style={{ background: '#81c784' }} />
+      <Handle type="source" position={Position.Bottom} style={{ background: '#81c784' }} />
       <Avatar
         sx={{
           width: 28,

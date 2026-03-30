@@ -1,8 +1,10 @@
 import { Handle, Position } from '@xyflow/react'
-import { Box, Typography } from '@mui/material'
+import { Box, Typography, Chip } from '@mui/material'
 import MenuBookIcon from '@mui/icons-material/MenuBook'
+import ScienceIcon from '@mui/icons-material/Science'
 
 export default function SubjectNode({ data }) {
+  const isLab = data.subject?.is_lab
   return (
     <Box
       sx={{
@@ -20,16 +22,21 @@ export default function SubjectNode({ data }) {
       }}
     >
       <Handle type="target" position={Position.Top} style={{ background: '#90caf9' }} />
-      <MenuBookIcon sx={{ fontSize: 18, color: '#1565c0' }} />
+      {isLab ? <ScienceIcon sx={{ fontSize: 18, color: '#e65100' }} /> : <MenuBookIcon sx={{ fontSize: 18, color: '#1565c0' }} />}
       <Box>
         <Typography sx={{ fontWeight: 600, fontSize: '0.8125rem', color: '#1565c0', lineHeight: 1.2 }}>
           {data.label}
         </Typography>
-        {data.subject?.code && (
-          <Typography sx={{ fontSize: '0.6875rem', color: '#42a5f5' }}>
-            {data.subject.code}
-          </Typography>
-        )}
+        <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', justifyContent: 'center', mt: 0.25 }}>
+          {data.subject?.code && (
+            <Typography sx={{ fontSize: '0.6875rem', color: '#42a5f5' }}>
+              {data.subject.code}
+            </Typography>
+          )}
+          {isLab && (
+            <Chip label="Lab" size="small" sx={{ height: 14, fontSize: '0.55rem', bgcolor: '#fff3e0', color: '#e65100', '& .MuiChip-label': { px: 0.5 } }} />
+          )}
+        </Box>
       </Box>
       <Handle type="source" position={Position.Bottom} style={{ background: '#90caf9' }} />
     </Box>

@@ -7,15 +7,37 @@ const EDGE_STYLE = {
   markerEnd: { type: MarkerType.ArrowClosed, color: '#94a3b8', width: 16, height: 16 },
 }
 
+/**
+ * Builds deduplicated node/edge arrays.
+ * Node IDs:
+ *   sem-{id}, sub-{id}, teacher-{id}
+ * Edge IDs:
+ *   e-sem-{semId}-sub-{subId}, e-sub-{subId}-teacher-{teacherId}
+ */
 export function buildFlowGraph({ semesters, semesterSubjectsMap, subjectTeachersMap }) {
   const nodes = []
   const edges = []
+  const seenNodes = new Set()
+  const seenEdges = new Set()
+
+  const addNode = (node) => {
+    if (!seenNodes.has(node.id)) {
+      seenNodes.add(node.id)
+      nodes.push(node)
+    }
+  }
+
+  const addEdge = (edge) => {
+    if (!seenEdges.has(edge.id)) {
+      seenEdges.add(edge.id)
+      edges.push(edge)
+    }
+  }
 
   semesters.forEach((sem) => {
     const semNodeId = `sem-${sem.id}`
 
-    // Semester node
-    nodes.push({
+    addNode({
       id: semNodeId,
       type: 'semester',
       data: { label: sem.name, semester: sem },
@@ -25,100 +47,40 @@ export function buildFlowGraph({ semesters, semesterSubjectsMap, subjectTeachers
     const subjects = semesterSubjectsMap[sem.id] || []
 
     subjects.forEach((sub) => {
-      const subNodeId = `sub-${sem.id}-${sub.id}`
+      const subNodeId = `sub-${sub.id}`
 
-      // Subject node
-      nodes.push({
+      addNode({
         id: subNodeId,
         type: 'subject',
         data: { label: sub.name, subject: sub },
         position: { x: 0, y: 0 },
       })
 
-      // Edge: Semester → Subject
-      edges.push({
-        id: `e-${semNodeId}-${subNodeId}`,
+      addEdge({
+        id: `e-sem-${sem.id}-sub-${sub.id}`,
         source: semNodeId,
         target: subNodeId,
         ...EDGE_STYLE,
       })
 
-      // Class type nodes
-      // Always create Theory node
-      const theoryNodeId = `type-${sem.id}-${sub.id}-theory`
-      nodes.push({
-        id: theoryNodeId,
-        type: 'classType',
-        data: { label: 'Theory', classType: 'theory' },
-        position: { x: 0, y: 0 },
-      })
-      edges.push({
-        id: `e-${subNodeId}-${theoryNodeId}`,
-        source: subNodeId,
-        target: theoryNodeId,
-        ...EDGE_STYLE,
-      })
-
-      // Create Practical node only if subject is_lab
-      let practicalNodeId = null
-      if (sub.is_lab) {
-        practicalNodeId = `type-${sem.id}-${sub.id}-practical`
-        nodes.push({
-          id: practicalNodeId,
-          type: 'classType',
-          data: { label: 'Practical', classType: 'practical' },
-          position: { x: 0, y: 0 },
-        })
-        edges.push({
-          id: `e-${subNodeId}-${practicalNodeId}`,
-          source: subNodeId,
-          target: practicalNodeId,
-          ...EDGE_STYLE,
-        })
-      }
-
-      // Teacher nodes — connect to all class type nodes for this subject
       const teachers = subjectTeachersMap[sub.id] || []
-      const teachersSeen = new Set()
 
       teachers.forEach((teacher) => {
-        // Connect teacher to Theory node
-        const teacherTheoryId = `teacher-${sem.id}-${sub.id}-theory-${teacher.id}`
-        if (!teachersSeen.has(teacherTheoryId)) {
-          teachersSeen.add(teacherTheoryId)
-          nodes.push({
-            id: teacherTheoryId,
-            type: 'teacher',
-            data: { label: teacher.name, teacher },
-            position: { x: 0, y: 0 },
-          })
-          edges.push({
-            id: `e-${theoryNodeId}-${teacherTheoryId}`,
-            source: theoryNodeId,
-            target: teacherTheoryId,
-            ...EDGE_STYLE,
-          })
-        }
+        const teacherNodeId = `teacher-${teacher.id}`
 
-        // Connect teacher to Practical node if it exists
-        if (practicalNodeId) {
-          const teacherPracId = `teacher-${sem.id}-${sub.id}-practical-${teacher.id}`
-          if (!teachersSeen.has(teacherPracId)) {
-            teachersSeen.add(teacherPracId)
-            nodes.push({
-              id: teacherPracId,
-              type: 'teacher',
-              data: { label: teacher.name, teacher },
-              position: { x: 0, y: 0 },
-            })
-            edges.push({
-              id: `e-${practicalNodeId}-${teacherPracId}`,
-              source: practicalNodeId,
-              target: teacherPracId,
-              ...EDGE_STYLE,
-            })
-          }
-        }
+        addNode({
+          id: teacherNodeId,
+          type: 'teacher',
+          data: { label: teacher.name, teacher },
+          position: { x: 0, y: 0 },
+        })
+
+        addEdge({
+          id: `e-sub-${sub.id}-teacher-${teacher.id}`,
+          source: subNodeId,
+          target: teacherNodeId,
+          ...EDGE_STYLE,
+        })
       })
     })
   })

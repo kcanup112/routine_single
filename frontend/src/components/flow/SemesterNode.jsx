@@ -30,6 +30,7 @@ export default function SemesterNode({ data }) {
           </Typography>
         )}
       </Box>
+      <Handle type="target" position={Position.Top} style={{ background: '#60a5fa' }} />
       <Handle type="source" position={Position.Bottom} style={{ background: '#60a5fa' }} />
     </Box>
   )
