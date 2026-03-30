@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   ReactFlow,
   Controls,
@@ -40,14 +40,14 @@ import MenuBookIcon from '@mui/icons-material/MenuBook'
 import PersonIcon from '@mui/icons-material/Person'
 import GroupsIcon from '@mui/icons-material/Groups'
 import { hierarchyService } from '../services/hierarchyService'
-import { semesterSubjectService, teacherSubjectService, semesterService, subjectService, teacherService, classService } from '../services/index'
+import { semesterSubjectService, teacherSubjectService, semesterService, classService } from '../services/index'
 import { buildFlowGraph } from '../utils/buildFlowGraph'
 import { getLayoutedElements } from '../utils/dagreLayout'
 import SemesterNode from '../components/flow/SemesterNode'
 import SubjectNode from '../components/flow/SubjectNode'
 import TeacherNode from '../components/flow/TeacherNode'
 import ClassNode from '../components/flow/ClassNode'
-import { ConfirmRemoveDialog } from '../components/flow/HierarchyDialogs'
+import { AddSubjectDialog, AddTeacherDialog, ConfirmRemoveDialog } from '../components/flow/HierarchyDialogs'
 
 const nodeTypes = {
   semester: SemesterNode,
@@ -73,29 +73,33 @@ const miniMapNodeColor = (node) => {
   }
 }
 
-// Parse flat node IDs: sem-{id}, cls-{id}, sub-{id}, teacher-{id}
+// Parse per-class node IDs:
+//   sem-{semId}, cls-{clsId},
+//   sub-{clsId}-{subId},
+//   teacher-{clsId}-{subId}-{teacherId}
 function parseNodeId(nodeId) {
   if (!nodeId) return {}
-  const parts = nodeId.split('-')
-  if (parts[0] === 'sem')     return { type: 'semester', semesterId: parseInt(parts[1]) }
-  if (parts[0] === 'cls')     return { type: 'class',    classId:    parseInt(parts[1]) }
-  if (parts[0] === 'sub')     return { type: 'subject',  subjectId:  parseInt(parts[1]) }
-  if (parts[0] === 'teacher') return { type: 'teacher',  teacherId:  parseInt(parts[1]) }
+  const p = nodeId.split('-')
+  if (p[0] === 'sem')     return { type: 'semester', semesterId: parseInt(p[1]) }
+  if (p[0] === 'cls')     return { type: 'class',    classId:    parseInt(p[1]) }
+  if (p[0] === 'sub')     return { type: 'subject',  classId:    parseInt(p[1]), subjectId:  parseInt(p[2]) }
+  if (p[0] === 'teacher') return { type: 'teacher',  classId:    parseInt(p[1]), subjectId:  parseInt(p[2]), teacherId:  parseInt(p[3]) }
   return {}
 }
 
-// Parse edge IDs
+// Parse per-class edge IDs:
+//   e-SC-{semId}-{clsId}              semester → class
+//   e-CS-{clsId}-{subId}              class    → subject
+//   e-ST-{clsId}-{subId}-{teacherId}  subject  → teacher (class-scoped)
 function parseEdgeId(edgeId) {
   if (!edgeId) return {}
   let m
-  m = edgeId.match(/^e-sem-(\d+)-cls-(\d+)$/);
-  if (m) return { type: 'semester-class',   semesterId: parseInt(m[1]), classId:   parseInt(m[2]) }
-  m = edgeId.match(/^e-sem-(\d+)-sub-(\d+)$/);
-  if (m) return { type: 'semester-subject', semesterId: parseInt(m[1]), subjectId: parseInt(m[2]) }
-  m = edgeId.match(/^e-cls-(\d+)-sub-(\d+)$/);
-  if (m) return { type: 'class-subject',    classId:    parseInt(m[1]), subjectId: parseInt(m[2]) }
-  m = edgeId.match(/^e-sub-(\d+)-teacher-(\d+)$/);
-  if (m) return { type: 'subject-teacher',  subjectId:  parseInt(m[1]), teacherId: parseInt(m[2]) }
+  m = edgeId.match(/^e-SC-(\d+)-(\d+)$/)
+  if (m) return { type: 'semester-class',  semesterId: parseInt(m[1]), classId:   parseInt(m[2]) }
+  m = edgeId.match(/^e-CS-(\d+)-(\d+)$/)
+  if (m) return { type: 'class-subject',   classId:    parseInt(m[1]), subjectId: parseInt(m[2]) }
+  m = edgeId.match(/^e-ST-(\d+)-(\d+)-(\d+)$/)
+  if (m) return { type: 'subject-teacher', classId:    parseInt(m[1]), subjectId: parseInt(m[2]), teacherId: parseInt(m[3]) }
   return {}
 }
 
@@ -108,8 +112,8 @@ export default function AcademicHierarchy() {
   const [error, setError] = useState(null)
   const [hierarchyData, setHierarchyData] = useState(null)
 
-  // Add-node toolbar state
-  const [addNodeType, setAddNodeType] = useState(null) // 'semester'|'subject'|'teacher'
+  // Add-node toolbar state (semester + class only)
+  const [addNodeType, setAddNodeType] = useState(null) // 'semester'|'class'
   const [availableItems, setAvailableItems] = useState([])
   const [addNodeMenuAnchor, setAddNodeMenuAnchor] = useState(null)
   const [loadingItems, setLoadingItems] = useState(false)
@@ -117,6 +121,10 @@ export default function AcademicHierarchy() {
   // Right-click context menu
   const [contextMenu, setContextMenu] = useState(null)
   const [contextNode, setContextNode] = useState(null)
+
+  // Dialog state
+  const [addSubjectOpen, setAddSubjectOpen] = useState(false)
+  const [addTeacherOpen, setAddTeacherOpen] = useState(false)
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false)
   const [dialogTarget, setDialogTarget] = useState(null)
 
@@ -159,7 +167,7 @@ export default function AcademicHierarchy() {
     loadData(val || null)
   }
 
-  // â”€â”€ Add Node Toolbar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -- Add Node Toolbar (Semester + Class only) ----------------------
   const openAddNodeMenu = async (event, type) => {
     setAddNodeMenuAnchor(event.currentTarget)
     setAddNodeType(type)
@@ -170,12 +178,9 @@ export default function AcademicHierarchy() {
       if (type === 'semester') {
         const res = await semesterService.getAll()
         items = res.data.filter((s) => !canvasIds.includes(`sem-${s.id}`))
-      } else if (type === 'subject') {
-        const res = await subjectService.getAll()
-        items = res.data.filter((s) => s.is_active && !canvasIds.includes(`sub-${s.id}`))
-      } else if (type === 'teacher') {
-        const res = await teacherService.getAll()
-        items = res.data.filter((t) => t.is_active && !canvasIds.includes(`teacher-${t.id}`))
+      } else if (type === 'class') {
+        const res = await classService.getAll()
+        items = res.data.filter((c) => c.is_active !== false && !canvasIds.includes(`cls-${c.id}`))
       }
       setAvailableItems(items)
     } finally {
@@ -196,100 +201,63 @@ export default function AcademicHierarchy() {
       newNode = { id: `sem-${item.id}`, type: 'semester', data: { label: item.name, semester: item }, position: { x: 100 + Math.random() * 200, y: 100 + Math.random() * 100 } }
     } else if (addNodeType === 'class') {
       newNode = { id: `cls-${item.id}`, type: 'class', data: { label: item.name, section: item.section, classObj: item }, position: { x: 100 + Math.random() * 300, y: 200 + Math.random() * 100 } }
-    } else if (addNodeType === 'subject') {
-      newNode = { id: `sub-${item.id}`, type: 'subject', data: { label: item.name, subject: item }, position: { x: 100 + Math.random() * 300, y: 300 + Math.random() * 100 } }
-    } else if (addNodeType === 'teacher') {
-      newNode = { id: `teacher-${item.id}`, type: 'teacher', data: { label: item.name, teacher: item }, position: { x: 100 + Math.random() * 300, y: 400 + Math.random() * 100 } }
     }
     if (newNode) setNodes((nds) => [...nds, newNode])
   }
 
-  // â”€â”€ Connect: draw edge â†’ persist to DB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -- Connect: only semester->class via drag; subjects/teachers via right-click --
   const onConnect = useCallback(async (connection) => {
     const src = parseNodeId(connection.source)
     const tgt = parseNodeId(connection.target)
-
-    // semester â†’ subject
-    if (src.type === 'semester' && tgt.type === 'subject') {
+    if (src.type === 'semester' && tgt.type === 'class') {
       try {
-        await semesterSubjectService.addSubject(src.semesterId, tgt.subjectId)
-        setEdges((eds) => addEdge({ ...connection, ...EDGE_DEFAULTS, id: `e-sem-${src.semesterId}-sub-${tgt.subjectId}` }, eds))
-        toast('Subject added to semester')
-      } catch (e) {
-        toast(e?.response?.data?.detail || 'Failed to add subject to semester', 'error')
-      }
+        await classService.update(tgt.classId, { semester_id: src.semesterId })
+        setEdges((eds) => addEdge({ ...connection, ...EDGE_DEFAULTS, id: `e-SC-${src.semesterId}-${tgt.classId}` }, eds))
+        toast('Class linked to semester')
+      } catch (e) { toast(e?.response?.data?.detail || 'Failed to link class', 'error') }
       return
     }
-
-    // subject â†’ teacher  OR  teacher â†’ subject
-    let subjectId, teacherId
-    if (src.type === 'subject' && tgt.type === 'teacher') {
-      subjectId = src.subjectId; teacherId = tgt.teacherId
-    } else if (src.type === 'teacher' && tgt.type === 'subject') {
-      subjectId = tgt.subjectId; teacherId = src.teacherId
-    }
-
-    if (subjectId && teacherId) {
-      try {
-        await teacherSubjectService.assignSubject(teacherId, subjectId)
-        setEdges((eds) => addEdge({ ...connection, ...EDGE_DEFAULTS, id: `e-sub-${subjectId}-teacher-${teacherId}` }, eds))
-        toast('Teacher assigned to subject')
-      } catch (e) {
-        toast(e?.response?.data?.detail || 'Failed to assign teacher', 'error')
-      }
-      return
-    }
-
-    toast('Invalid connection: only Semesterâ†’Subject or Subjectâ†”Teacher connections are allowed', 'error')
+    toast('Right-click a Class to add Subjects, or right-click a Subject to add Teachers', 'info')
   }, [setEdges, toast])
 
-  // â”€â”€ Delete edge â†’ remove DB relationship â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -- Delete edge -> remove DB relationship ----------------------------
   const onEdgesDelete = useCallback(async (deletedEdges) => {
     for (const edge of deletedEdges) {
-      const parsed = parseEdgeId(edge.id)
+      const ep = parseEdgeId(edge.id)
       try {
-        if (parsed.type === 'semester-subject') {
-          await semesterSubjectService.removeSubject(parsed.semesterId, parsed.subjectId)
-          toast('Subject removed from semester')
-        } else if (parsed.type === 'class-subject') {
-          const classNode = nodes.find((n) => n.id === `cls-${parsed.classId}`)
-          const semesterId = classNode?.data?.classObj?.semester_id
-          if (semesterId) await semesterSubjectService.removeSubject(semesterId, parsed.subjectId)
-          toast('Subject removed from class')
-        } else if (parsed.type === 'subject-teacher') {
-          await teacherSubjectService.removeSubject(parsed.teacherId, parsed.subjectId)
+        if (ep.type === 'class-subject') {
+          const clsNode = nodes.find((n) => n.id === `cls-${ep.classId}`)
+          const semesterId = clsNode?.data?.classObj?.semester_id
+          if (semesterId) { await semesterSubjectService.removeSubject(semesterId, ep.subjectId); toast('Subject removed from class') }
+        } else if (ep.type === 'subject-teacher') {
+          await teacherSubjectService.removeSubject(ep.teacherId, ep.subjectId)
           toast('Teacher removed from subject')
         }
-        // semester-class edges: no DB removal (class.semester_id is set in class record)
-      } catch (e) {
-        toast(e?.response?.data?.detail || 'Failed to remove connection', 'error')
-      }
+      } catch (e) { toast(e?.response?.data?.detail || 'Failed to remove connection', 'error') }
     }
   }, [nodes, toast])
 
-  // â”€â”€ Delete node â†’ remove all its DB relationships â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -- Delete node -> remove all its DB relationships -------------------
   const onNodesDelete = useCallback(async (deletedNodes) => {
     for (const node of deletedNodes) {
       const relatedEdges = edges.filter((e) => e.source === node.id || e.target === node.id)
       for (const edge of relatedEdges) {
         const ep = parseEdgeId(edge.id)
         try {
-          if (ep.type === 'semester-subject') {
-            await semesterSubjectService.removeSubject(ep.semesterId, ep.subjectId)
-          } else if (ep.type === 'class-subject') {
-            const classNode = nodes.find((n) => n.id === `cls-${ep.classId}`)
-            const semesterId = classNode?.data?.classObj?.semester_id
+          if (ep.type === 'class-subject') {
+            const clsNode = nodes.find((n) => n.id === `cls-${ep.classId}`)
+            const semesterId = clsNode?.data?.classObj?.semester_id
             if (semesterId) await semesterSubjectService.removeSubject(semesterId, ep.subjectId)
           } else if (ep.type === 'subject-teacher') {
             await teacherSubjectService.removeSubject(ep.teacherId, ep.subjectId)
           }
         } catch {}
       }
-      toast(`${node.data.label} removed from canvas`)
+      toast(`${node.data.label} removed`)
     }
   }, [edges, nodes, toast])
 
-  // â”€â”€ Right-click context menu â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -- Right-click context menu ------------------------------------------
   const onNodeContextMenu = useCallback((event, node) => {
     event.preventDefault()
     setContextMenu({ top: event.clientY, left: event.clientX })
@@ -298,11 +266,18 @@ export default function AcademicHierarchy() {
 
   const closeContextMenu = () => { setContextMenu(null); setContextNode(null) }
 
-  const handleContextAction = (action) => {
+  // Context actions: class->addSubject, subject->addTeacher, all->remove
+  const handleContextAction = useCallback((action) => {
     if (!contextNode) return
     const parsed = parseNodeId(contextNode.id)
-    if (action === 'remove-from-canvas') {
-      // Just remove from canvas, no DB call
+    if (action === 'add-subject') {
+      // dialogTarget holds class info needed to add a subject
+      setDialogTarget({ classId: parsed.classId, classObj: contextNode.data.classObj, label: contextNode.data.label })
+      setAddSubjectOpen(true)
+    } else if (action === 'add-teacher') {
+      setDialogTarget({ subjectId: parsed.subjectId, classId: parsed.classId, subject: contextNode.data.subject, label: contextNode.data.label })
+      setAddTeacherOpen(true)
+    } else if (action === 'remove-from-canvas') {
       setNodes((nds) => nds.filter((n) => n.id !== contextNode.id))
       setEdges((eds) => eds.filter((e) => e.source !== contextNode.id && e.target !== contextNode.id))
     } else if (action === 'delete-relations') {
@@ -310,26 +285,58 @@ export default function AcademicHierarchy() {
       setRemoveDialogOpen(true)
     }
     closeContextMenu()
+  }, [contextNode, setNodes, setEdges])
+
+  // Add subject to class (right-click class -> Add Subject)
+  const handleAddSubject = async (semesterId, subjectId) => {
+    if (!semesterId) { toast('Class has no semester assigned', 'error'); return }
+    await semesterSubjectService.addSubject(semesterId, subjectId)
+    toast('Subject added')
+    loadData(selectedProgramme || null)
+  }
+
+  // Add teacher to subject (right-click subject -> Add Teacher)
+  const handleAddTeacher = async (teacherId, subjectId) => {
+    await teacherSubjectService.assignSubject(teacherId, subjectId)
+    toast('Teacher assigned')
+    loadData(selectedProgramme || null)
   }
 
   const handleRemoveConfirm = async () => {
-    const { node } = dialogTarget
+    const { node, parsed } = dialogTarget
     const relatedEdges = edges.filter((e) => e.source === node.id || e.target === node.id)
     for (const edge of relatedEdges) {
       const ep = parseEdgeId(edge.id)
       try {
-        if (ep.type === 'semester-subject') await semesterSubjectService.removeSubject(ep.semesterId, ep.subjectId)
-        else if (ep.type === 'class-subject') {
-          const classNode = nodes.find((n) => n.id === `cls-${ep.classId}`)
-          const semesterId = classNode?.data?.classObj?.semester_id
+        if (ep.type === 'class-subject') {
+          const clsNode = nodes.find((n) => n.id === `cls-${ep.classId}`)
+          const semesterId = clsNode?.data?.classObj?.semester_id
           if (semesterId) await semesterSubjectService.removeSubject(semesterId, ep.subjectId)
-        } else if (ep.type === 'subject-teacher') await teacherSubjectService.removeSubject(ep.teacherId, ep.subjectId)
+        } else if (ep.type === 'subject-teacher') {
+          await teacherSubjectService.removeSubject(ep.teacherId, ep.subjectId)
+        }
       } catch {}
     }
     setNodes((nds) => nds.filter((n) => n.id !== node.id))
     setEdges((eds) => eds.filter((e) => e.source !== node.id && e.target !== node.id))
     toast(`${dialogTarget.label} and its connections removed`)
   }
+
+  // Existing teacher IDs for the add-teacher dialog (avoid duplicates)
+  const existingTeacherIds = useMemo(() => {
+    if (!dialogTarget?.subjectId) return []
+    return nodes
+      .filter((n) => n.type === 'teacher' && parseNodeId(n.id).classId === dialogTarget.classId && parseNodeId(n.id).subjectId === dialogTarget.subjectId)
+      .map((n) => parseNodeId(n.id).teacherId)
+  }, [nodes, dialogTarget])
+
+  // Existing subject IDs for the add-subject dialog (avoid duplicates per class)
+  const existingSubjectIds = useMemo(() => {
+    if (!dialogTarget?.classId) return []
+    return nodes
+      .filter((n) => n.type === 'subject' && parseNodeId(n.id).classId === dialogTarget.classId)
+      .map((n) => parseNodeId(n.id).subjectId)
+  }, [nodes, dialogTarget])
 
   const stats = useMemo(() => ({
     semCount: nodes.filter((n) => n.type === 'semester').length,
@@ -347,7 +354,7 @@ export default function AcademicHierarchy() {
           <Box>
             <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>Academic Hierarchy</Typography>
             <Typography variant="body2" sx={{ color: '#64748b' }}>
-              Drag handles to connect â€¢ Right-click to remove â€¢ Delete key removes selected
+              Right-click Class to add Subjects • Right-click Subject to add Teachers • Delete key removes selected
             </Typography>
           </Box>
         </Box>
@@ -413,20 +420,6 @@ export default function AcademicHierarchy() {
                     + Class
                   </Button>
                 </Tooltip>
-                <Tooltip title="Add Subject node">
-                  <Button size="small" variant="outlined" startIcon={<MenuBookIcon />}
-                    onClick={(e) => openAddNodeMenu(e, 'subject')}
-                    sx={{ borderColor: '#1565c0', color: '#1565c0', fontSize: '0.75rem', textTransform: 'none', '&:hover': { bgcolor: '#e3f2fd' } }}>
-                    + Subject
-                  </Button>
-                </Tooltip>
-                <Tooltip title="Add Teacher node">
-                  <Button size="small" variant="outlined" startIcon={<PersonIcon />}
-                    onClick={(e) => openAddNodeMenu(e, 'teacher')}
-                    sx={{ borderColor: '#2e7d32', color: '#2e7d32', fontSize: '0.75rem', textTransform: 'none', '&:hover': { bgcolor: '#e8f5e9' } }}>
-                    + Teacher
-                  </Button>
-                </Tooltip>
               </Paper>
             </Panel>
           </ReactFlow>
@@ -445,9 +438,7 @@ export default function AcademicHierarchy() {
             <MenuItem key={item.id} onClick={() => handleAddNodeFromMenu(item)}>
               <Box>
                 <Typography sx={{ fontWeight: 600, fontSize: '0.875rem' }}>{item.name}</Typography>
-                {(item.code || item.abbreviation) && (
-                  <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>{item.code || item.abbreviation}</Typography>
-                )}
+                {item.section && <Typography sx={{ fontSize: '0.75rem', color: '#64748b' }}>{item.section}</Typography>}
               </Box>
             </MenuItem>
           ))
@@ -459,6 +450,19 @@ export default function AcademicHierarchy() {
         <Menu open onClose={closeContextMenu} anchorReference="anchorPosition"
           anchorPosition={{ top: contextMenu.top, left: contextMenu.left }}
           slotProps={{ paper: { sx: { borderRadius: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.12)', minWidth: 220 } } }}>
+          {contextNode.type === 'class' && (
+            <MenuItem onClick={() => handleContextAction('add-subject')}>
+              <ListItemIcon><AddIcon sx={{ color: '#1565c0' }} /></ListItemIcon>
+              <ListItemText>Add Subject to this Class</ListItemText>
+            </MenuItem>
+          )}
+          {contextNode.type === 'subject' && (
+            <MenuItem onClick={() => handleContextAction('add-teacher')}>
+              <ListItemIcon><PersonAddIcon sx={{ color: '#2e7d32' }} /></ListItemIcon>
+              <ListItemText>Add Teacher to this Subject</ListItemText>
+            </MenuItem>
+          )}
+          {(contextNode.type === 'class' || contextNode.type === 'subject') && <Divider />}
           <MenuItem onClick={() => handleContextAction('remove-from-canvas')}>
             <ListItemIcon><DeleteIcon sx={{ color: '#64748b' }} /></ListItemIcon>
             <ListItemText>Remove from canvas only</ListItemText>
@@ -470,6 +474,24 @@ export default function AcademicHierarchy() {
           </MenuItem>
         </Menu>
       )}
+
+      {/* Add Subject Dialog (right-click class) */}
+      <AddSubjectDialog
+        open={addSubjectOpen}
+        onClose={() => setAddSubjectOpen(false)}
+        semester={{ id: dialogTarget?.classObj?.semester_id, name: dialogTarget?.label }}
+        existingSubjectIds={existingSubjectIds}
+        onConfirm={(semId, subId) => handleAddSubject(semId, subId)}
+      />
+
+      {/* Add Teacher Dialog (right-click subject) */}
+      <AddTeacherDialog
+        open={addTeacherOpen}
+        onClose={() => setAddTeacherOpen(false)}
+        subject={{ id: dialogTarget?.subjectId, name: dialogTarget?.label }}
+        existingTeacherIds={existingTeacherIds}
+        onConfirm={(teacherId, subjectId) => handleAddTeacher(teacherId, subjectId)}
+      />
 
       {/* Confirm Remove Dialog */}
       <ConfirmRemoveDialog
