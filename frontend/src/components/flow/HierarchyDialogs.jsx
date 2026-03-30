@@ -34,7 +34,7 @@ export function AddSubjectDialog({ open, onClose, semester, existingSubjectIds, 
     setSubmitting(true)
     setError(null)
     try {
-      await onConfirm(semester.id, selectedSubjectId)
+      await onConfirm(semester.id, subjects.find((s) => s.id === selectedSubjectId))
       onClose()
     } catch (err) {
       setError(err?.response?.data?.detail || 'Failed to add subject')
@@ -115,7 +115,7 @@ export function AddTeacherDialog({ open, onClose, subject, existingTeacherIds, o
     setSubmitting(true)
     setError(null)
     try {
-      await onConfirm(selectedTeacherId, subject.id)
+      await onConfirm(teachers.find((t) => t.id === selectedTeacherId), subject.id)
       onClose()
     } catch (err) {
       setError(err?.response?.data?.detail || 'Failed to assign teacher')

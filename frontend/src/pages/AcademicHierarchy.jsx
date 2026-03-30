@@ -40,7 +40,7 @@ import MenuBookIcon from '@mui/icons-material/MenuBook'
 import PersonIcon from '@mui/icons-material/Person'
 import GroupsIcon from '@mui/icons-material/Groups'
 import { hierarchyService } from '../services/hierarchyService'
-import { semesterSubjectService, teacherSubjectService, semesterService, classService } from '../services/index'
+import { semesterSubjectService, teacherSubjectService, semesterService, classService, subjectService, teacherService } from '../services/index'
 import { buildFlowGraph } from '../utils/buildFlowGraph'
 import { getLayoutedElements } from '../utils/dagreLayout'
 import SemesterNode from '../components/flow/SemesterNode'
@@ -112,8 +112,8 @@ export default function AcademicHierarchy() {
   const [error, setError] = useState(null)
   const [hierarchyData, setHierarchyData] = useState(null)
 
-  // Add-node toolbar state (semester + class only)
-  const [addNodeType, setAddNodeType] = useState(null) // 'semester'|'class'
+  // Add-node toolbar state
+  const [addNodeType, setAddNodeType] = useState(null) // 'semester'|'class'|'subject'|'teacher'
   const [availableItems, setAvailableItems] = useState([])
   const [addNodeMenuAnchor, setAddNodeMenuAnchor] = useState(null)
   const [loadingItems, setLoadingItems] = useState(false)
@@ -167,7 +167,7 @@ export default function AcademicHierarchy() {
     loadData(val || null)
   }
 
-  // -- Add Node Toolbar (Semester + Class only) ----------------------
+  // -- Add Node Toolbar ----------------------
   const openAddNodeMenu = async (event, type) => {
     setAddNodeMenuAnchor(event.currentTarget)
     setAddNodeType(type)
@@ -181,6 +181,12 @@ export default function AcademicHierarchy() {
       } else if (type === 'class') {
         const res = await classService.getAll()
         items = res.data.filter((c) => c.is_active !== false && !canvasIds.includes(`cls-${c.id}`))
+      } else if (type === 'subject') {
+        const res = await subjectService.getAll()
+        items = res.data.filter((s) => s.is_active !== false)
+      } else if (type === 'teacher') {
+        const res = await teacherService.getAll()
+        items = res.data.filter((t) => t.is_active !== false)
       }
       setAvailableItems(items)
     } finally {
@@ -201,11 +207,15 @@ export default function AcademicHierarchy() {
       newNode = { id: `sem-${item.id}`, type: 'semester', data: { label: item.name, semester: item }, position: { x: 100 + Math.random() * 200, y: 100 + Math.random() * 100 } }
     } else if (addNodeType === 'class') {
       newNode = { id: `cls-${item.id}`, type: 'class', data: { label: item.name, section: item.section, classObj: item }, position: { x: 100 + Math.random() * 300, y: 200 + Math.random() * 100 } }
+    } else if (addNodeType === 'subject') {
+      newNode = { id: `sub-0-${item.id}-${Date.now()}`, type: 'subject', data: { label: item.name, subject: item }, position: { x: 100 + Math.random() * 400, y: 300 + Math.random() * 100 } }
+    } else if (addNodeType === 'teacher') {
+      newNode = { id: `teacher-0-0-${item.id}-${Date.now()}`, type: 'teacher', data: { label: item.name, teacher: item, load: '' }, position: { x: 100 + Math.random() * 400, y: 400 + Math.random() * 100 } }
     }
     if (newNode) setNodes((nds) => [...nds, newNode])
   }
 
-  // -- Connect: only semester->class via drag; subjects/teachers via right-click --
+  // -- Connect: semester->class, class->subject, subject->teacher via drag --
   const onConnect = useCallback(async (connection) => {
     const src = parseNodeId(connection.source)
     const tgt = parseNodeId(connection.target)
@@ -217,8 +227,26 @@ export default function AcademicHierarchy() {
       } catch (e) { toast(e?.response?.data?.detail || 'Failed to link class', 'error') }
       return
     }
-    toast('Right-click a Class to add Subjects, or right-click a Subject to add Teachers', 'info')
-  }, [setEdges, toast])
+    if (src.type === 'class' && tgt.type === 'subject') {
+      const clsNode = nodes.find((n) => n.id === connection.source)
+      const semId = clsNode?.data?.classObj?.semester_id
+      try {
+        if (semId) await semesterSubjectService.addSubject(semId, tgt.subjectId)
+        setEdges((eds) => addEdge({ ...connection, ...EDGE_DEFAULTS, id: `e-CS-${src.classId}-${tgt.subjectId}` }, eds))
+        toast('Subject linked to class')
+      } catch (e) { toast(e?.response?.data?.detail || 'Failed to link subject', 'error') }
+      return
+    }
+    if (src.type === 'subject' && tgt.type === 'teacher') {
+      try {
+        await teacherSubjectService.assignSubject(tgt.teacherId, src.subjectId)
+        setEdges((eds) => addEdge({ ...connection, ...EDGE_DEFAULTS, id: `e-ST-${src.classId}-${src.subjectId}-${tgt.teacherId}` }, eds))
+        toast('Teacher linked to subject')
+      } catch (e) { toast(e?.response?.data?.detail || 'Failed to link teacher', 'error') }
+      return
+    }
+    toast('Connect: Semester→Class, Class→Subject, or Subject→Teacher', 'info')
+  }, [nodes, setEdges, toast])
 
   // -- Delete edge -> remove DB relationship ----------------------------
   const onEdgesDelete = useCallback(async (deletedEdges) => {
@@ -288,18 +316,39 @@ export default function AcademicHierarchy() {
   }, [contextNode, setNodes, setEdges])
 
   // Add subject to class (right-click class -> Add Subject)
-  const handleAddSubject = async (semesterId, subjectId) => {
-    if (!semesterId) { toast('Class has no semester assigned', 'error'); return }
-    await semesterSubjectService.addSubject(semesterId, subjectId)
+  const handleAddSubject = async (semesterId, subject) => {
+    if (!semesterId || !subject) { toast('Class has no semester assigned', 'error'); return }
+    await semesterSubjectService.addSubject(semesterId, subject.id)
+    const classId = dialogTarget?.classId
+    const newNodeId = `sub-${classId}-${subject.id}`
+    const newNode = {
+      id: newNodeId,
+      type: 'subject',
+      data: { label: subject.name, subject },
+      position: { x: 300 + Math.random() * 150, y: 300 + Math.random() * 150 },
+    }
+    const newEdge = { ...EDGE_DEFAULTS, id: `e-CS-${classId}-${subject.id}`, source: `cls-${classId}`, target: newNodeId }
+    setNodes((nds) => [...nds, newNode])
+    setEdges((eds) => [...eds, newEdge])
     toast('Subject added')
-    loadData(selectedProgramme || null)
   }
 
   // Add teacher to subject (right-click subject -> Add Teacher)
-  const handleAddTeacher = async (teacherId, subjectId) => {
-    await teacherSubjectService.assignSubject(teacherId, subjectId)
+  const handleAddTeacher = async (teacher, subjectId) => {
+    if (!teacher) return
+    await teacherSubjectService.assignSubject(teacher.id, subjectId)
+    const classId = dialogTarget?.classId
+    const newNodeId = `teacher-${classId}-${subjectId}-${teacher.id}`
+    const newNode = {
+      id: newNodeId,
+      type: 'teacher',
+      data: { label: teacher.name, teacher, load: '' },
+      position: { x: 400 + Math.random() * 150, y: 450 + Math.random() * 150 },
+    }
+    const newEdge = { ...EDGE_DEFAULTS, id: `e-ST-${classId}-${subjectId}-${teacher.id}`, source: `sub-${classId}-${subjectId}`, target: newNodeId }
+    setNodes((nds) => [...nds, newNode])
+    setEdges((eds) => [...eds, newEdge])
     toast('Teacher assigned')
-    loadData(selectedProgramme || null)
   }
 
   const handleRemoveConfirm = async () => {
@@ -405,19 +454,33 @@ export default function AcademicHierarchy() {
 
             {/* Add Node Toolbar */}
             <Panel position="top-left">
-              <Paper elevation={2} sx={{ p: 1, borderRadius: 2, display: 'flex', gap: 1, bgcolor: '#fff' }}>
-                <Tooltip title="Add Semester node">
+              <Paper elevation={2} sx={{ p: 0.75, borderRadius: 2, display: 'flex', flexDirection: 'column', gap: 0.75, bgcolor: '#fff' }}>
+                <Tooltip title="Add Semester node" placement="right">
                   <Button size="small" variant="outlined" startIcon={<SchoolIcon />}
                     onClick={(e) => openAddNodeMenu(e, 'semester')}
-                    sx={{ borderColor: '#1e3a5f', color: '#1e3a5f', fontSize: '0.75rem', textTransform: 'none', '&:hover': { bgcolor: '#e8eaf6' } }}>
+                    sx={{ borderColor: '#1e3a5f', color: '#1e3a5f', fontSize: '0.75rem', textTransform: 'none', justifyContent: 'flex-start', '&:hover': { bgcolor: '#e8eaf6' } }}>
                     + Semester
                   </Button>
                 </Tooltip>
-                <Tooltip title="Add Class node">
+                <Tooltip title="Add Class node" placement="right">
                   <Button size="small" variant="outlined" startIcon={<GroupsIcon />}
                     onClick={(e) => openAddNodeMenu(e, 'class')}
-                    sx={{ borderColor: '#7b1fa2', color: '#7b1fa2', fontSize: '0.75rem', textTransform: 'none', '&:hover': { bgcolor: '#f3e5f5' } }}>
+                    sx={{ borderColor: '#7b1fa2', color: '#7b1fa2', fontSize: '0.75rem', textTransform: 'none', justifyContent: 'flex-start', '&:hover': { bgcolor: '#f3e5f5' } }}>
                     + Class
+                  </Button>
+                </Tooltip>
+                <Tooltip title="Add Subject node" placement="right">
+                  <Button size="small" variant="outlined" startIcon={<MenuBookIcon />}
+                    onClick={(e) => openAddNodeMenu(e, 'subject')}
+                    sx={{ borderColor: '#1565c0', color: '#1565c0', fontSize: '0.75rem', textTransform: 'none', justifyContent: 'flex-start', '&:hover': { bgcolor: '#e3f2fd' } }}>
+                    + Subject
+                  </Button>
+                </Tooltip>
+                <Tooltip title="Add Teacher node" placement="right">
+                  <Button size="small" variant="outlined" startIcon={<PersonIcon />}
+                    onClick={(e) => openAddNodeMenu(e, 'teacher')}
+                    sx={{ borderColor: '#2e7d32', color: '#2e7d32', fontSize: '0.75rem', textTransform: 'none', justifyContent: 'flex-start', '&:hover': { bgcolor: '#e8f5e9' } }}>
+                    + Teacher
                   </Button>
                 </Tooltip>
               </Paper>
@@ -481,7 +544,7 @@ export default function AcademicHierarchy() {
         onClose={() => setAddSubjectOpen(false)}
         semester={{ id: dialogTarget?.classObj?.semester_id, name: dialogTarget?.label }}
         existingSubjectIds={existingSubjectIds}
-        onConfirm={(semId, subId) => handleAddSubject(semId, subId)}
+        onConfirm={(semId, subject) => handleAddSubject(semId, subject)}
       />
 
       {/* Add Teacher Dialog (right-click subject) */}
@@ -490,7 +553,7 @@ export default function AcademicHierarchy() {
         onClose={() => setAddTeacherOpen(false)}
         subject={{ id: dialogTarget?.subjectId, name: dialogTarget?.label }}
         existingTeacherIds={existingTeacherIds}
-        onConfirm={(teacherId, subjectId) => handleAddTeacher(teacherId, subjectId)}
+        onConfirm={(teacher, subjectId) => handleAddTeacher(teacher, subjectId)}
       />
 
       {/* Confirm Remove Dialog */}
