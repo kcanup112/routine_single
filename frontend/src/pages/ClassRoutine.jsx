@@ -374,6 +374,25 @@ export default function ClassRoutine() {
       const entries = []
       Object.entries(routineData).forEach(([key, value]) => {
         const [dayId, periodId] = key.split('-').map(Number)
+
+        if (value.isContinuation) return
+
+        // BREAK / LC → persist with subject_id=null, group='BREAK'/'LC'
+        const isBreak = value.subject_id === 'BREAK'
+        const isLC    = value.subject_id === 'LC'
+        if (isBreak || isLC) {
+          entries.push({
+            dayId,
+            periodId,
+            subject_id: null,
+            is_lab: false,
+            is_half_lab: false,
+            num_periods: value.num_periods || 1,
+            lead_teacher_id: null,
+            group: isBreak ? 'BREAK' : 'LC',
+          })
+          return
+        }
         
         // If this is a multi-subject lab, create multiple entries
         if (value.lab_subjects && value.lab_subjects.length > 0) {
@@ -383,8 +402,8 @@ export default function ClassRoutine() {
               periodId,
               subject_id: labSubject.subject_id,
               is_lab: true,
-              is_half_lab: labSubject.is_half_lab || false, // Use individual lab subject's is_half_lab
-              num_periods: labSubject.num_periods || value.num_periods || 1, // Use individual lab subject's num_periods
+              is_half_lab: labSubject.is_half_lab || false,
+              num_periods: labSubject.num_periods || value.num_periods || 1,
               lead_teacher_id: labSubject.lead_teacher_id || null,
               assist_teacher_1_id: labSubject.assist_teacher_1_id || null,
               assist_teacher_2_id: labSubject.assist_teacher_2_id || null,
@@ -640,6 +659,25 @@ export default function ClassRoutine() {
       const entries = []
       Object.entries(routineData).forEach(([key, value]) => {
         const [dayId, periodId] = key.split('-').map(Number)
+
+        if (value.isContinuation) return
+
+        // BREAK / LC → persist with subject_id=null, group='BREAK'/'LC'
+        const isBreak = value.subject_id === 'BREAK'
+        const isLC    = value.subject_id === 'LC'
+        if (isBreak || isLC) {
+          entries.push({
+            dayId,
+            periodId,
+            subject_id: null,
+            is_lab: false,
+            is_half_lab: false,
+            num_periods: value.num_periods || 1,
+            lead_teacher_id: null,
+            group: isBreak ? 'BREAK' : 'LC',
+          })
+          return
+        }
         
         // If this is a multi-subject lab, create multiple entries
         if (value.lab_subjects && value.lab_subjects.length > 0) {
@@ -650,7 +688,7 @@ export default function ClassRoutine() {
               periodId,
               subject_id: labSubject.subject_id,
               is_lab: true,
-              is_half_lab: labSubject.is_half_lab || false, // Use individual lab subject's is_half_lab
+              is_half_lab: labSubject.is_half_lab || false,
               num_periods: value.num_periods || 1,
               lead_teacher_id: labSubject.lead_teacher_id || null,
               assist_teacher_1_id: labSubject.assist_teacher_1_id || null,
@@ -2970,48 +3008,46 @@ export default function ClassRoutine() {
 
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
-      <Box sx={{ p: 2 }}>
-        {/* Header Section */}
-        <Box sx={{ 
-          mb: 3, 
-          p: { xs: 2, sm: 3 }, 
-          borderRadius: 2,
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          color: 'white',
-          boxShadow: 3,
-        }}>
-          <Typography variant="h4" sx={{ fontWeight: 700, mb: 1, fontSize: { xs: '1.5rem', sm: '2rem' } }}>
-            📅 Class Routine Management
-          </Typography>
-          <Typography variant="body1" sx={{ opacity: 0.9, fontSize: { xs: '0.875rem', sm: '1rem' } }}>
-            Create and manage class schedules with drag-and-drop functionality
-          </Typography>
+      <Box>
+        {/* Page Header */}
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+          <Box>
+            <Typography variant="h5" sx={{ fontWeight: 700, color: '#1a2332', mb: 0.25 }}>
+              Class Routine Management
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#8896a4' }}>
+              Create and manage class schedules with drag-and-drop functionality
+            </Typography>
+          </Box>
         </Box>
 
-        <Paper elevation={3} sx={{ mb: 2, borderRadius: 2, overflow: 'hidden' }}>
+        <Paper elevation={0} sx={{ mb: 2, borderRadius: '16px', overflow: 'hidden', border: '1px solid #e8edf2' }}>
           <Tabs 
             value={tabValue} 
             onChange={(e, newValue) => setTabValue(newValue)}
             sx={{
-              bgcolor: '#f5f7fa',
+              bgcolor: '#f8fafc',
+              borderBottom: '1px solid #e8edf2',
               '& .MuiTab-root': {
                 fontWeight: 600,
                 fontSize: '0.95rem',
+                textTransform: 'none',
+                color: '#8896a4',
               },
               '& .Mui-selected': {
-                color: '#667eea',
+                color: '#2d6a6f',
               },
             }}
             TabIndicatorProps={{
               style: {
-                background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+                background: '#2d6a6f',
                 height: 3,
               }
             }}
           >
-            <Tab label="📝 Routine Form" />
-            <Tab label="📊 Export" disabled={false} />
-            <Tab label="📆 Day-wise Export" disabled={false} />
+            <Tab label="Routine Form" />
+            <Tab label="Export" disabled={false} />
+            <Tab label="Day-wise Export" disabled={false} />
           </Tabs>
 
           <TabPanel value={tabValue} index={0}>
@@ -3021,9 +3057,9 @@ export default function ClassRoutine() {
               sx={{ 
                 p: { xs: 2, sm: 3 }, 
                 mb: 3, 
-                bgcolor: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
-                borderRadius: 2,
-                border: '2px solid #e0e7ff',
+                bgcolor: '#f8fafc',
+                borderRadius: '12px',
+                border: '1px solid #e8edf2',
               }}
             >
               <Grid container spacing={{ xs: 1.5, sm: 2 }} alignItems="center">
@@ -3194,11 +3230,11 @@ export default function ClassRoutine() {
                 }}
               >
                 <Box sx={{ 
-                  bgcolor: 'primary.main', 
+                  bgcolor: '#2d6a6f', 
                   color: 'white', 
                   p: { xs: 1.5, sm: 2 }, 
                   mb: 0,
-                  borderRadius: isFullscreen ? 0 : 1,
+                  borderRadius: isFullscreen ? 0 : '12px 12px 0 0',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
@@ -3233,30 +3269,28 @@ export default function ClassRoutine() {
                 ) : (
                   <TableContainer 
                     component={Paper} 
-                    elevation={3}
+                    elevation={0}
                     sx={{ 
-                      border: '2px solid #e0e7ff', 
+                      border: '1px solid #e8edf2', 
                       height: isFullscreen ? 'calc(100vh - 64px)' : { xs: 'auto', sm: 'calc(100vh - 220px)' },
                       overflow: 'auto',
-                      borderRadius: isFullscreen ? 0 : 2,
+                      borderRadius: isFullscreen ? 0 : '0 0 12px 12px',
                     }}
                   >
                   <Table size="small" sx={{ 
                     '& td, & th': { 
-                      border: '1px solid #e0e7ff', 
+                      border: '1px solid #e8edf2', 
                       minWidth: { xs: 80, sm: 120 },
                       fontSize: { xs: '0.7rem', sm: '0.875rem' },
                       padding: { xs: '4px', sm: '8px' },
                     } 
                   }}>
                     <TableHead>
-                      <TableRow sx={{ 
-                        background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
-                      }}>
+                      <TableRow sx={{ bgcolor: '#f8fafc' }}>
                         <TableCell sx={{ 
                           fontWeight: 700, 
                           minWidth: 100,
-                          color: 'black',
+                          color: '#1a2332',
                           fontSize: '0.95rem',
                         }}>
                           Days \ Time
@@ -3267,7 +3301,7 @@ export default function ClassRoutine() {
                             align="center"
                             sx={{ 
                               fontWeight: 700,
-                              color: 'black',
+                              color: '#1a2332',
                               fontSize: '0.875rem',
                             }}
                           >
@@ -3280,7 +3314,7 @@ export default function ClassRoutine() {
                       {days.map((day) => (
                         <TableRow key={day.id} sx={{
                           '&:hover': {
-                            bgcolor: 'rgba(102, 126, 234, 0.05)',
+                            bgcolor: '#f8fafc',
                           },
                         }}>
                           <TableCell 
@@ -3288,8 +3322,8 @@ export default function ClassRoutine() {
                             scope="row"
                             sx={{ 
                               fontWeight: 700,
-                              bgcolor: '#f3f4f6',
-                              color: '#667eea',
+                              bgcolor: '#f8fafc',
+                              color: '#2d6a6f',
                               fontSize: '0.9rem',
                             }}
                           >
@@ -3356,16 +3390,18 @@ export default function ClassRoutine() {
                     disabled={!isAdmin()}
                     fullWidth
                     sx={{
-                      background: 'linear-gradient(45deg, #667eea 30%, #764ba2 90%)',
+                      backgroundColor: '#2d6a6f',
                       color: 'white',
                       px: 3,
                       py: 1,
                       fontWeight: 600,
-                      boxShadow: '0 3px 5px 2px rgba(102, 126, 234, .3)',
+                      borderRadius: '10px',
+                      boxShadow: 'none',
                       maxWidth: { xs: '100%', sm: 'auto' },
+                      textTransform: 'none',
                       '&:hover': {
-                        background: 'linear-gradient(45deg, #764ba2 30%, #667eea 90%)',
-                        boxShadow: '0 4px 8px 3px rgba(102, 126, 234, .4)',
+                        backgroundColor: '#235558',
+                        boxShadow: 'none',
                       },
                     }}
                   >
@@ -3377,16 +3413,11 @@ export default function ClassRoutine() {
           </TabPanel>
 
           <TabPanel value={tabValue} index={1}>
-            <Box sx={{ 
-              p: { xs: 2, sm: 3 },
-              background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
-              borderRadius: 2,
-              mb: 3,
-            }}>
-              <Typography variant="h5" sx={{ fontWeight: 700, color: '#667eea', mb: 1, fontSize: { xs: '1.25rem', sm: '1.5rem' } }}>
-                📊 Export Routine
+            <Box sx={{ p: { xs: 2, sm: 3 }, bgcolor: '#f8fafc', borderRadius: '12px', mb: 3, border: '1px solid #e8edf2' }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: '#1a2332', mb: 0.5 }}>
+                Export Routine
               </Typography>
-              <Typography variant="body2" color="text.secondary" paragraph sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+              <Typography variant="body2" sx={{ color: '#8896a4' }}>
                 Export the class routine to Excel format with proper formatting and styling.
               </Typography>
             </Box>
@@ -3398,70 +3429,56 @@ export default function ClassRoutine() {
                 startIcon={<ExportIcon />}
                 onClick={handleExport}
                 disabled={!formData.class_id}
-                fullWidth
                 sx={{
-                  background: 'linear-gradient(45deg, #43e97b 30%, #38f9d7 90%)',
+                  backgroundColor: '#2d6a6f',
                   color: 'white',
                   px: 3,
                   py: 1.5,
                   fontWeight: 600,
-                  boxShadow: '0 3px 5px 2px rgba(67, 233, 123, .3)',
-                  maxWidth: { xs: '100%', sm: 'auto' },
-                  '&:hover': {
-                    background: 'linear-gradient(45deg, #38f9d7 30%, #43e97b 90%)',
-                    boxShadow: '0 4px 8px 3px rgba(67, 233, 123, .4)',
-                  },
-                  '&:disabled': {
-                    background: '#ccc',
-                  },
+                  borderRadius: '10px',
+                  boxShadow: 'none',
+                  textTransform: 'none',
+                  '&:hover': { backgroundColor: '#235558', boxShadow: 'none' },
+                  '&:disabled': { background: '#ccc' },
                 }}
               >
                 Export Current Class
               </Button>
               
               <Button
-                variant="contained"
+                variant="outlined"
                 size="large"
                 startIcon={<ExportIcon />}
                 onClick={handleExportAll}
-                fullWidth
                 sx={{
-                  background: 'linear-gradient(45deg, #f093fb 30%, #f5576c 90%)',
-                  color: 'white',
+                  borderColor: '#2d6a6f',
+                  color: '#2d6a6f',
                   px: 3,
                   py: 1.5,
                   fontWeight: 600,
-                  boxShadow: '0 3px 5px 2px rgba(240, 147, 251, .3)',
-                  maxWidth: { xs: '100%', sm: 'auto' },
-                  '&:hover': {
-                    background: 'linear-gradient(45deg, #f5576c 30%, #f093fb 90%)',
-                    boxShadow: '0 4px 8px 3px rgba(240, 147, 251, .4)',
-                  },
+                  borderRadius: '10px',
+                  textTransform: 'none',
+                  '&:hover': { borderColor: '#235558', backgroundColor: '#2d6a6f10' },
                 }}
               >
                 Export All Classes
               </Button>
             </Box>
             
-            <Paper elevation={0} sx={{ mt: 3, p: 2, bgcolor: '#f3f4f6', borderRadius: 2 }}>
-              <Typography variant="body2" color="text.secondary">
-                💡 <strong>Export Current Class:</strong> Exports only the selected class routine<br />
-                📚 <strong>Export All Classes:</strong> Exports all class routines in a single Excel file with separate sheets
+            <Paper elevation={0} sx={{ mt: 3, p: 2, bgcolor: '#f8fafc', borderRadius: '12px', border: '1px solid #e8edf2' }}>
+              <Typography variant="body2" sx={{ color: '#8896a4' }}>
+                <strong>Export Current Class:</strong> Exports only the selected class routine<br />
+                <strong>Export All Classes:</strong> Exports all class routines in a single Excel file with separate sheets
               </Typography>
             </Paper>
           </TabPanel>
 
           <TabPanel value={tabValue} index={2}>
-            <Box sx={{ 
-              p: { xs: 2, sm: 3 },
-              background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
-              borderRadius: 2,
-              mb: 3,
-            }}>
-              <Typography variant="h5" sx={{ fontWeight: 700, color: '#667eea', mb: 1, fontSize: { xs: '1.25rem', sm: '1.5rem' } }}>
-                📆 Day-wise Export
+            <Box sx={{ p: { xs: 2, sm: 3 }, bgcolor: '#f8fafc', borderRadius: '12px', mb: 3, border: '1px solid #e8edf2' }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: '#1a2332', mb: 0.5 }}>
+                Day-wise Export
               </Typography>
-              <Typography variant="body2" color="text.secondary" paragraph sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+              <Typography variant="body2" sx={{ color: '#8896a4' }}>
                 Export all classes with separate sheets for each day (Sunday to Thursday). 
                 Each sheet shows all classes with time slots as columns.
               </Typography>
@@ -3473,19 +3490,16 @@ export default function ClassRoutine() {
                 size="large"
                 startIcon={<ExportIcon />}
                 onClick={handleExportDayWise}
-                fullWidth
                 sx={{
-                  background: 'linear-gradient(45deg, #4facfe 30%, #00f2fe 90%)',
+                  backgroundColor: '#2d6a6f',
                   color: 'white',
                   px: 3,
                   py: 1.5,
                   fontWeight: 600,
-                  boxShadow: '0 3px 5px 2px rgba(79, 172, 254, .3)',
-                  maxWidth: { xs: '100%', sm: 'auto' },
-                  '&:hover': {
-                    background: 'linear-gradient(45deg, #00f2fe 30%, #4facfe 90%)',
-                    boxShadow: '0 4px 8px 3px rgba(79, 172, 254, .4)',
-                  },
+                  borderRadius: '10px',
+                  boxShadow: 'none',
+                  textTransform: 'none',
+                  '&:hover': { backgroundColor: '#235558', boxShadow: 'none' },
                 }}
               >
                 Export Day-wise Routine

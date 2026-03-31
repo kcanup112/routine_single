@@ -250,11 +250,11 @@ export default function Shifts() {
       width: 120,
       sortable: false,
       renderCell: (params) => (
-        <Box>
-          <IconButton size="small" onClick={() => handleEdit(params.row)} color="primary">
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+          <IconButton size="small" onClick={() => handleEdit(params.row)} sx={{ color: '#2d6a6f', backgroundColor: '#2d6a6f18', borderRadius: '8px', p: '5px', '&:hover': { backgroundColor: '#2d6a6f30' } }}>
             <EditIcon fontSize="small" />
           </IconButton>
-          <IconButton size="small" onClick={() => handleDelete(params.row.id)} color="error">
+          <IconButton size="small" onClick={() => handleDelete(params.row.id)} sx={{ color: '#ef4444', backgroundColor: '#ef444418', borderRadius: '8px', p: '5px', '&:hover': { backgroundColor: '#ef444430' } }}>
             <DeleteIcon fontSize="small" />
           </IconButton>
         </Box>
@@ -264,11 +264,12 @@ export default function Shifts() {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" gutterBottom>
-          Shifts Management
-        </Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpen}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+        <Box>
+          <Typography variant="h5" sx={{ fontWeight: 700, color: '#1a2332', mb: 0.25 }}>Shifts</Typography>
+          <Typography variant="body2" sx={{ color: '#8896a4' }}>Manage shift timings, working days and breaks</Typography>
+        </Box>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpen} sx={{ borderRadius: '10px', px: 2.5, textTransform: 'none', fontWeight: 600, backgroundColor: '#2d6a6f', boxShadow: 'none', '&:hover': { backgroundColor: '#235558', boxShadow: 'none' } }}>
           Add Shift
         </Button>
       </Box>
@@ -279,7 +280,7 @@ export default function Shifts() {
         </Alert>
       )}
 
-      <Paper sx={{ height: 600, width: '100%' }}>
+      <Paper elevation={0} sx={{ border: '1px solid #e8edf2', borderRadius: '16px', overflow: 'hidden' }}>
         <DataGrid
           rows={shifts}
           columns={columns}
@@ -287,16 +288,13 @@ export default function Shifts() {
           rowsPerPageOptions={[10, 25, 50]}
           loading={loading}
           disableSelectionOnClick
+          autoHeight
           getRowHeight={() => 'auto'}
-          sx={{
-            '& .MuiDataGrid-cell': {
-              py: 1,
-            },
-          }}
+          sx={{ border: 'none', '& .MuiDataGrid-columnHeaders': { backgroundColor: '#f8fafc', borderBottom: '1px solid #e8edf2' }, '& .MuiDataGrid-cell': { borderColor: '#f0f4f8', fontSize: '0.87rem', py: 1 }, '& .MuiDataGrid-row:hover': { backgroundColor: '#f8fafc' }, '& .MuiDataGrid-footerContainer': { borderTop: '1px solid #e8edf2', backgroundColor: '#fafcfe' } }}
         />
       </Paper>
 
-      <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
+      <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth PaperProps={{ sx: { borderRadius: '16px' } }}>
         <DialogTitle>{editMode ? 'Edit Shift' : 'Add New Shift'}</DialogTitle>
         <DialogContent>
           {error && (
@@ -435,9 +433,9 @@ export default function Shifts() {
             </Grid>
           </Grid>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleClose}>Cancel</Button>
-          <Button onClick={handleSubmit} variant="contained" disabled={loading}>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={handleClose} sx={{ borderRadius: '8px', textTransform: 'none' }}>Cancel</Button>
+          <Button onClick={handleSubmit} variant="contained" disabled={loading} sx={{ borderRadius: '8px', textTransform: 'none', backgroundColor: '#2d6a6f', boxShadow: 'none', '&:hover': { backgroundColor: '#235558' } }}>
             {editMode ? 'Update' : 'Create'}
           </Button>
         </DialogActions>

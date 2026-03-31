@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Typography,
   Button,
@@ -21,10 +21,13 @@ import { DataGrid } from '@mui/x-data-grid'
 import { 
   Add as AddIcon, 
   Edit as EditIcon, 
+  Delete as DeleteIcon,
   ArrowForward as ArrowForwardIcon,
   ArrowBack as ArrowBackIcon,
   Subject as SubjectIcon,
   Search as SearchIcon,
+  CloudUpload as CloudUploadIcon,
+  Download as DownloadIcon,
 } from '@mui/icons-material'
 import { teacherService, departmentService, teacherSubjectService } from '../services'
 
@@ -58,6 +61,10 @@ export default function Teachers() {
   const [subjectLoading, setSubjectLoading] = useState(false)
   const [availableSearch, setAvailableSearch] = useState('')
   const [assignedSearch, setAssignedSearch] = useState('')
+  const csvInputRef = useRef(null)
+  const [csvImportOpen, setCsvImportOpen] = useState(false)
+  const [csvProcessing, setCsvProcessing] = useState(false)
+  const [csvResults, setCsvResults] = useState(null)
 
   const loadTeachers = async () => {
     try {
@@ -231,6 +238,72 @@ export default function Teachers() {
     subject.code.toLowerCase().includes(assignedSearch.toLowerCase())
   )
 
+  const parseCSV = (text) => {
+    const lines = text.trim().split('\n')
+    const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''))
+    return lines.slice(1).filter(l => l.trim()).map(line => {
+      const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''))
+      const obj = {}
+      headers.forEach((h, i) => { obj[h] = values[i] || '' })
+      return obj
+    })
+  }
+
+  const handleDownloadTeacherTemplate = () => {
+    const headers = 'name,abbreviation,employee_id,email,phone,designation,qualification,employment_type,max_periods_per_week,department_name'
+    const example = 'Ram Thapa,RT,EMP001,ram@example.com,9800000001,Lecturer,M.Tech,full_time,30,Computer'
+    const csv = headers + '\n' + example
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'teachers_template.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleCsvImport = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    e.target.value = ''
+    setCsvProcessing(true)
+    setCsvResults(null)
+    setCsvImportOpen(true)
+    try {
+      const text = await file.text()
+      const rows = parseCSV(text)
+      let success = 0
+      const errors = []
+      for (const row of rows) {
+        try {
+          const dept = departments.find(d => d.name.toLowerCase() === (row.department_name || '').toLowerCase())
+          const data = {
+            name: row.name,
+            abbreviation: row.abbreviation || null,
+            employee_id: row.employee_id,
+            email: row.email || null,
+            phone: row.phone || null,
+            designation: row.designation || null,
+            qualification: row.qualification || null,
+            employment_type: row.employment_type || 'full_time',
+            max_periods_per_week: parseInt(row.max_periods_per_week) || 30,
+            department_id: dept ? dept.id : null,
+            is_active: true,
+          }
+          await teacherService.create(data)
+          success++
+        } catch (err) {
+          errors.push(`"${row.name}": ${err.response?.data?.detail || err.message}`)
+        }
+      }
+      setCsvResults({ success, errors })
+      await loadTeachers()
+    } catch (err) {
+      setCsvResults({ success: 0, errors: [`Failed to parse file: ${err.message}`] })
+    }
+    setCsvProcessing(false)
+  }
+
   const getDepartmentName = (departmentId) => {
     if (!departmentId) return 'Not Assigned'
     const dept = departments.find((d) => d.id === departmentId)
@@ -281,43 +354,40 @@ export default function Teachers() {
       headerName: 'Actions',
       width: 300,
       renderCell: (params) => (
-        <div style={{ display: 'flex', gap: 8 }}>
-          <Button 
-            color="primary" 
-            size="small"
-            startIcon={<EditIcon />}
-            onClick={() => handleEdit(params.row)}
-          >
-            Edit
-          </Button>
-          <Button 
-            color="secondary" 
-            size="small"
-            startIcon={<SubjectIcon />}
-            onClick={() => handleOpenSubjectDialog(params.row)}
-          >
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+          <IconButton size="small" onClick={() => handleEdit(params.row)} sx={{ color: '#2d6a6f', backgroundColor: '#2d6a6f18', borderRadius: '8px', p: '5px', '&:hover': { backgroundColor: '#2d6a6f30' } }}>
+            <EditIcon fontSize="small" />
+          </IconButton>
+          <Button size="small" variant="outlined" startIcon={<SubjectIcon />} onClick={() => handleOpenSubjectDialog(params.row)} sx={{ borderRadius: '8px', textTransform: 'none', fontSize: '0.75rem', px: 1.2, py: 0.3, borderColor: '#8b5cf618', color: '#8b5cf6', backgroundColor: '#8b5cf608', '&:hover': { borderColor: '#8b5cf6', backgroundColor: '#8b5cf612' } }}>
             Subjects
           </Button>
-          <Button 
-            color="error" 
-            size="small"
-            onClick={() => handleDelete(params.row.id)}
-          >
-            Delete
-          </Button>
-        </div>
+          <IconButton size="small" onClick={() => handleDelete(params.row.id)} sx={{ color: '#ef4444', backgroundColor: '#ef444418', borderRadius: '8px', p: '5px', '&:hover': { backgroundColor: '#ef444430' } }}>
+            <DeleteIcon fontSize="small" />
+          </IconButton>
+        </Box>
       ),
     },
   ]
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, alignItems: 'center' }}>
-        <Typography variant="h4">Teachers</Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpen}>
-          Add Teacher
-        </Button>
-      </div>
+    <Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+        <Box>
+          <Typography variant="h5" sx={{ fontWeight: 700, color: '#1a2332', mb: 0.25 }}>Teachers</Typography>
+          <Typography variant="body2" sx={{ color: '#8896a4' }}>Manage teaching staff, designations and subject assignments</Typography>
+        </Box>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button variant="outlined" startIcon={<DownloadIcon />} onClick={handleDownloadTeacherTemplate} sx={{ borderRadius: '10px', px: 2, textTransform: 'none', fontWeight: 600, borderColor: '#e8edf2', color: '#2d6a6f', '&:hover': { borderColor: '#2d6a6f', backgroundColor: '#2d6a6f10' } }}>
+            Template
+          </Button>
+          <Button variant="outlined" startIcon={<CloudUploadIcon />} onClick={() => csvInputRef.current.click()} sx={{ borderRadius: '10px', px: 2, textTransform: 'none', fontWeight: 600, borderColor: '#e8edf2', color: '#2d6a6f', '&:hover': { borderColor: '#2d6a6f', backgroundColor: '#2d6a6f10' } }}>
+            Import CSV
+          </Button>
+          <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpen} sx={{ borderRadius: '10px', px: 2.5, textTransform: 'none', fontWeight: 600, backgroundColor: '#2d6a6f', boxShadow: 'none', '&:hover': { backgroundColor: '#235558', boxShadow: 'none' } }}>
+            Add Teacher
+          </Button>
+        </Box>
+      </Box>
 
       {/* Search Bar */}
       <Box sx={{ mb: 2 }}>
@@ -328,26 +398,23 @@ export default function Teachers() {
           onChange={(e) => setSearchQuery(e.target.value)}
           variant="outlined"
           size="medium"
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon />
-              </InputAdornment>
-            ),
-          }}
+          sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px', backgroundColor: '#ffffff' } }}
+          InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon sx={{ color: '#a0aec0' }} /></InputAdornment>) }}
         />
       </Box>
 
-      <Paper style={{ height: 400, width: '100%' }}>
+      <Paper elevation={0} sx={{ border: '1px solid #e8edf2', borderRadius: '16px', overflow: 'hidden' }}>
         <DataGrid
           rows={filteredTeachers}
           columns={columns}
           pageSize={5}
           rowsPerPageOptions={[5, 10, 20]}
+          autoHeight
+          sx={{ border: 'none', '& .MuiDataGrid-columnHeaders': { backgroundColor: '#f8fafc', borderBottom: '1px solid #e8edf2' }, '& .MuiDataGrid-cell': { borderColor: '#f0f4f8', fontSize: '0.87rem' }, '& .MuiDataGrid-row:hover': { backgroundColor: '#f8fafc' }, '& .MuiDataGrid-footerContainer': { borderTop: '1px solid #e8edf2', backgroundColor: '#fafcfe' } }}
         />
       </Paper>
 
-      <Dialog open={open} onClose={handleClose}>
+      <Dialog open={open} onClose={handleClose} PaperProps={{ sx: { borderRadius: '16px' } }}>
         <DialogTitle>{editMode ? 'Edit Teacher' : 'Add Teacher'}</DialogTitle>
         <DialogContent>
           <TextField
@@ -447,9 +514,9 @@ export default function Teachers() {
             ))}
           </TextField>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleClose}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={loading}>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={handleClose} sx={{ borderRadius: '8px', textTransform: 'none' }}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={loading} sx={{ borderRadius: '8px', textTransform: 'none', color: '#2d6a6f', fontWeight: 600 }}>
             {editMode ? 'Update' : 'Add'}
           </Button>
         </DialogActions>
@@ -461,6 +528,7 @@ export default function Teachers() {
         onClose={handleCloseSubjectDialog}
         maxWidth="md"
         fullWidth
+        PaperProps={{ sx: { borderRadius: '16px' } }}
       >
         <DialogTitle>
           Manage Subjects for {selectedTeacher?.name}
@@ -526,7 +594,7 @@ export default function Teachers() {
 
               {/* Assigned Subjects */}
               <Grid item xs={5}>
-                <Paper elevation={2} sx={{ p: 2, bgcolor: 'primary.light', color: 'primary.contrastText' }}>
+                <Paper elevation={0} sx={{ p: 2, bgcolor: '#2d6a6f', borderRadius: '12px' }}>
                   <Typography variant="h6" gutterBottom>
                     Assigned Subjects
                   </Typography>
@@ -577,10 +645,36 @@ export default function Teachers() {
             </Grid>
           )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseSubjectDialog}>Close</Button>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={handleCloseSubjectDialog} sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 600 }}>Close</Button>
         </DialogActions>
       </Dialog>
-    </div>
+
+      <input type="file" accept=".csv" ref={csvInputRef} onChange={handleCsvImport} style={{ display: 'none' }} />
+
+      <Dialog open={csvImportOpen} onClose={() => !csvProcessing && setCsvImportOpen(false)} PaperProps={{ sx: { borderRadius: '16px', minWidth: 420 } }}>
+        <DialogTitle>CSV Import Results</DialogTitle>
+        <DialogContent>
+          {csvProcessing ? (
+            <Typography sx={{ py: 1 }}>Importing teachers, please wait...</Typography>
+          ) : csvResults ? (
+            <Box>
+              <Typography sx={{ color: '#16a34a', fontWeight: 600, mb: 0.5 }}>✓ {csvResults.success} teacher(s) imported successfully</Typography>
+              {csvResults.errors.length > 0 && (
+                <Box sx={{ mt: 1 }}>
+                  <Typography sx={{ color: '#ef4444', fontWeight: 600, mb: 0.5 }}>✗ {csvResults.errors.length} row(s) failed:</Typography>
+                  {csvResults.errors.map((err, i) => (
+                    <Typography key={i} variant="body2" sx={{ color: '#ef4444', mt: 0.5, pl: 1, fontSize: '0.8rem' }}>{err}</Typography>
+                  ))}
+                </Box>
+              )}
+            </Box>
+          ) : null}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setCsvImportOpen(false)} disabled={csvProcessing} sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 600, color: '#2d6a6f' }}>Close</Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
   )
 }

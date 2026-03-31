@@ -880,14 +880,18 @@ export default function TeacherRoutine() {
   }
 
   return (
-    <Box sx={{ p: 2 }}>
-      <Typography variant="h4" gutterBottom>
-        Teacher Routine
-      </Typography>
+    <Box>
+      {/* Page Header */}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+        <Box>
+          <Typography variant="h5" sx={{ fontWeight: 700, color: '#1a2332', mb: 0.25 }}>Teacher Routine</Typography>
+          <Typography variant="body2" sx={{ color: '#8896a4' }}>View and export individual teacher schedules</Typography>
+        </Box>
+      </Box>
 
       {/* Teacher Selection */}
-      <Paper sx={{ p: 2, mb: 3, bgcolor: 'grey.50' }}>
-        <Box sx={{ display: 'flex', gap: 3, alignItems: 'center', flexWrap: 'wrap' }}>
+      <Paper elevation={0} sx={{ p: 2.5, mb: 3, border: '1px solid #e8edf2', borderRadius: '16px', backgroundColor: '#f8fafc' }}>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
           <Autocomplete
             options={teachers}
             getOptionLabel={(option) => {
@@ -905,27 +909,26 @@ export default function TeacherRoutine() {
                 label="Select Teacher"
                 placeholder="Type to search..."
                 size="small"
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px', backgroundColor: '#ffffff' } }}
               />
             )}
-            sx={{ minWidth: 400, flex: 1 }}
+            sx={{ minWidth: 340, flex: 1 }}
           />
           
           <Button
             variant="outlined"
-            color="primary"
             startIcon={<RefreshIcon />}
             onClick={handleRefresh}
-            sx={{ px: 3, py: 1.5 }}
+            sx={{ borderRadius: '10px', px: 2.5, textTransform: 'none', fontWeight: 600, borderColor: '#e8edf2', color: '#8896a4', '&:hover': { borderColor: '#2d6a6f', color: '#2d6a6f', backgroundColor: '#2d6a6f10' } }}
           >
             Refresh
           </Button>
           
           <Button
-            variant="contained"
-            color="primary"
+            variant="outlined"
             startIcon={<ExportIcon />}
             onClick={handleExportAllTeachers}
-            sx={{ px: 3, py: 1.5 }}
+            sx={{ borderRadius: '10px', px: 2.5, textTransform: 'none', fontWeight: 600, borderColor: '#e8edf2', color: '#2d6a6f', '&:hover': { borderColor: '#2d6a6f', backgroundColor: '#2d6a6f10' } }}
           >
             Export All Teachers
           </Button>
@@ -934,30 +937,29 @@ export default function TeacherRoutine() {
             <>
               <Box 
                 sx={{ 
-                  bgcolor: 'primary.main', 
+                  bgcolor: '#2d6a6f', 
                   color: 'white', 
-                  px: 3, 
-                  py: 1.5, 
-                  borderRadius: 1,
+                  px: 2.5, 
+                  py: 1, 
+                  borderRadius: '10px',
                   display: 'flex',
                   alignItems: 'center',
                   gap: 1,
                 }}
               >
-                <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
                   Total Load:
                 </Typography>
-                <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                <Typography variant="body1" sx={{ fontWeight: 700 }}>
                   {totalLoad.toFixed(1)}
                 </Typography>
               </Box>
 
               <Button
                 variant="contained"
-                color="success"
                 startIcon={<ExportIcon />}
                 onClick={handleExportTeacherRoutine}
-                sx={{ px: 3, py: 1.5 }}
+                sx={{ borderRadius: '10px', px: 2.5, textTransform: 'none', fontWeight: 600, backgroundColor: '#2d6a6f', boxShadow: 'none', '&:hover': { backgroundColor: '#235558', boxShadow: 'none' } }}
               >
                 Export to Excel
               </Button>
@@ -979,11 +981,11 @@ export default function TeacherRoutine() {
           bgcolor: isFullscreen ? 'white' : 'transparent',
         }}>
           <Box sx={{ 
-            bgcolor: 'primary.main', 
+            bgcolor: '#2d6a6f', 
             color: 'white', 
             p: 2, 
             mb: 0,
-            borderRadius: isFullscreen ? 0 : 1,
+            borderRadius: isFullscreen ? 0 : '12px 12px 0 0',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -1016,30 +1018,28 @@ export default function TeacherRoutine() {
             <TableContainer 
               component={Paper} 
               sx={{ 
-                border: 1, 
-                borderColor: 'divider',
+                border: '1px solid #e8edf2', 
                 height: isFullscreen ? 'calc(100vh - 64px)' : 'calc(100vh - 280px)',
                 overflow: 'auto',
-                borderRadius: isFullscreen ? 0 : 1,
+                borderRadius: isFullscreen ? 0 : '0 0 12px 12px',
               }}
             >
               <Table size="small" sx={{ 
                 '& td, & th': { 
-                  border: 1, 
-                  borderColor: 'divider',
+                  border: '1px solid #e8edf2', 
                   minWidth: 120,
                 } 
               }}>
                 <TableHead>
-                  <TableRow sx={{ bgcolor: 'grey.200' }}>
-                    <TableCell sx={{ fontWeight: 'bold', minWidth: 100 }}>
+                  <TableRow sx={{ bgcolor: '#f8fafc' }}>
+                    <TableCell sx={{ fontWeight: 700, minWidth: 100, color: '#1a2332' }}>
                       Days \ Time
                     </TableCell>
                     {periods.map((period) => (
                       <TableCell 
                         key={period.id} 
                         align="center"
-                        sx={{ fontWeight: 'bold' }}
+                        sx={{ fontWeight: 700, color: '#1a2332' }}
                       >
                         {period.start_time?.substring(0, 5)}-{period.end_time?.substring(0, 5)}
                       </TableCell>
@@ -1053,8 +1053,9 @@ export default function TeacherRoutine() {
                         component="th" 
                         scope="row"
                         sx={{ 
-                          fontWeight: 'bold',
-                          bgcolor: 'grey.100',
+                          fontWeight: 700,
+                          bgcolor: '#f8fafc',
+                          color: '#1a2332',
                         }}
                       >
                         {day.name}

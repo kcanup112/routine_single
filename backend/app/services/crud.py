@@ -685,7 +685,7 @@ class ClassRoutineService:
                 class_id=class_id,
                 day_id=entry_data['dayId'],
                 period_id=entry_data['periodId'],
-                subject_id=entry_data['subject_id'],
+                subject_id=entry_data.get('subject_id'),  # None for BREAK/LC
                 is_lab=entry_data.get('is_lab', False),
                 is_half_lab=entry_data.get('is_half_lab', False),
                 num_periods=entry_data.get('num_periods', 1),
@@ -712,13 +712,23 @@ class ClassRoutineService:
         
         result = []
         for entry in entries:
+            # Reconstruct virtual subject_id for BREAK / LC entries
+            if entry.subject_id is None and entry.group in ('BREAK', 'LC'):
+                virtual_sid = entry.group       # 'BREAK' or 'LC'
+                virtual_name = 'Break' if entry.group == 'BREAK' else 'Library Consultation'
+                virtual_code = entry.group
+            else:
+                virtual_sid = entry.subject_id
+                virtual_name = entry.subject.name if entry.subject else ''
+                virtual_code = entry.subject.code if entry.subject else ''
+
             result.append({
                 'id': entry.id,
                 'dayId': entry.day_id,
                 'periodId': entry.period_id,
-                'subject_id': entry.subject_id,
-                'subject_name': entry.subject.name if entry.subject else '',
-                'subject_code': entry.subject.code if entry.subject else '',
+                'subject_id': virtual_sid,
+                'subject_name': virtual_name,
+                'subject_code': virtual_code,
                 'is_lab': entry.is_lab,
                 'is_half_lab': entry.is_half_lab,
                 'num_periods': entry.num_periods,
@@ -912,6 +922,10 @@ class RoutineGeneratorService:
     """
     Auto-generate theory-only routine entries for a list of classes.
 
+    Delegates to CP-SAT solver (routine_solver.py) by default.
+    Falls back to the legacy greedy algorithm if ortools is unavailable
+    or if solver='greedy' is explicitly requested.
+
     Block-size rules (consecutive pairs prioritised):
       load=1 → [1]
       load=2 → [2]
@@ -933,7 +947,30 @@ class RoutineGeneratorService:
         return blocks
 
     @staticmethod
-    def generate(db, assignments: list) -> dict:
+    def generate(db, assignments: list, solver: str = "cpsat") -> dict:
+        """
+        Entry point.  *solver* can be ``"cpsat"`` (default) or ``"greedy"``.
+        """
+        if solver == "cpsat":
+            try:
+                from app.services.routine_solver import CPSATRoutineSolver
+                return CPSATRoutineSolver.solve(db, assignments)
+            except ImportError:
+                import logging
+                logging.getLogger(__name__).warning(
+                    "ortools not installed – falling back to greedy generator"
+                )
+            except Exception as exc:
+                import logging
+                logging.getLogger(__name__).error(
+                    "CP-SAT solver failed (%s) – falling back to greedy", exc
+                )
+
+        # ── legacy greedy algorithm ─────────────────────────────────────
+        return RoutineGeneratorService._greedy(db, assignments)
+
+    @staticmethod
+    def _greedy(db, assignments: list) -> dict:
         from collections import defaultdict
 
         # 1. Working days ordered by day_number

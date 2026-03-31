@@ -373,19 +373,22 @@ export default function Schedules() {
   })
 
   return (
-    <Box sx={{ p: 2 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h4">
-          Teacher Load Report
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+    <Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+        <Box>
+          <Typography variant="h5" sx={{ fontWeight: 700, color: '#1a2332', mb: 0.25 }}>
+            Teacher Load Report
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#8896a4' }}>Effective teaching load and workload distribution</Typography>
+        </Box>
+        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
           <TextField
             select
             label="Filter by Department"
             value={selectedDepartment}
             onChange={(e) => setSelectedDepartment(e.target.value)}
             size="small"
-            sx={{ minWidth: 200 }}
+            sx={{ minWidth: 180, '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
           >
             <MenuItem value="all">All Departments</MenuItem>
             <MenuItem value="unassigned">Not Assigned</MenuItem>
@@ -401,7 +404,7 @@ export default function Schedules() {
             value={selectedRecruitment}
             onChange={(e) => setSelectedRecruitment(e.target.value)}
             size="small"
-            sx={{ minWidth: 180 }}
+            sx={{ minWidth: 150, '& .MuiOutlinedInput-root': { borderRadius: '10px' } }}
           >
             <MenuItem value="all">All Types</MenuItem>
             <MenuItem value="full_time">Full Time</MenuItem>
@@ -409,18 +412,18 @@ export default function Schedules() {
           </TextField>
           <Button
             variant="outlined"
-            color="primary"
             startIcon={<RefreshIcon />}
             onClick={fetchLoadData}
+            sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600, borderColor: '#e8edf2', color: '#8896a4', '&:hover': { borderColor: '#2d6a6f', color: '#2d6a6f', backgroundColor: '#2d6a6f10' } }}
           >
             Refresh
           </Button>
           <Button
             variant="contained"
-            color="success"
             startIcon={<DownloadIcon />}
             onClick={exportToExcel}
             disabled={filteredLoadData.length === 0}
+            sx={{ borderRadius: '10px', textTransform: 'none', fontWeight: 600, backgroundColor: '#10b981', boxShadow: 'none', '&:hover': { backgroundColor: '#059669', boxShadow: 'none' } }}
           >
             Export to Excel
           </Button>

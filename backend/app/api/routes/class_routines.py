@@ -10,7 +10,7 @@ router = APIRouter(prefix="/class-routines", tags=["class-routines"])
 class RoutineEntryCreate(BaseModel):
     dayId: int
     periodId: int
-    subject_id: int
+    subject_id: Optional[int] = None
     is_lab: bool = False
     is_half_lab: bool = False
     num_periods: int = 1
@@ -90,14 +90,25 @@ def check_teacher_conflict(
     return result
 
 @router.post("/generate/")
-def generate_routine(request: GenerateRequest, db: Session = Depends(get_db)):
+def generate_routine(
+    request: GenerateRequest,
+    db: Session = Depends(get_db),
+    solver: str = "cpsat",
+):
     """
     Auto-generate theory routine entries for the given class-subject-teacher assignments.
-    Prioritises consecutive 2-period blocks. Skips slots occupied by labs or other classes.
+
+    Query params:
+      solver – ``cpsat`` (default, uses OR-Tools CP-SAT) or ``greedy`` (legacy first-fit).
+
+    CP-SAT respects existing entries as immutable and only fills remaining load.
+    Greedy deletes existing theory entries and regenerates from scratch.
     """
+    if solver not in ("cpsat", "greedy"):
+        raise HTTPException(status_code=400, detail="solver must be 'cpsat' or 'greedy'")
     try:
         result = RoutineGeneratorService.generate(
-            db, [a.dict() for a in request.assignments]
+            db, [a.dict() for a in request.assignments], solver=solver
         )
         return result
     except Exception as e:

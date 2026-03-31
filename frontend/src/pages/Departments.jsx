@@ -12,9 +12,10 @@ import {
   ListItem,
   ListItemText,
   Box,
+  IconButton,
 } from '@mui/material'
 import { DataGrid } from '@mui/x-data-grid'
-import { Add as AddIcon, Edit as EditIcon } from '@mui/icons-material'
+import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material'
 import { departmentService, teacherService } from '../services'
 
 export default function Departments() {
@@ -198,51 +199,43 @@ export default function Departments() {
       headerName: 'Actions',
       width: 200,
       renderCell: (params) => (
-        <div style={{ display: 'flex', gap: 8 }}>
-          <Button
-            color="primary"
-            size="small"
-            startIcon={<EditIcon />}
-            onClick={() => handleEdit(params.row)}
-          >
-            Edit
-          </Button>
-          <Button
-            color="error"
-            size="small"
-            onClick={() => handleDelete(params.row.id)}
-          >
-            Delete
-          </Button>
-        </div>
+        <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+          <IconButton size="small" onClick={() => handleEdit(params.row)} sx={{ color: '#2d6a6f', backgroundColor: '#2d6a6f18', borderRadius: '8px', p: '5px', '&:hover': { backgroundColor: '#2d6a6f30' } }}>
+            <EditIcon fontSize="small" />
+          </IconButton>
+          <IconButton size="small" onClick={() => handleDelete(params.row.id)} sx={{ color: '#ef4444', backgroundColor: '#ef444418', borderRadius: '8px', p: '5px', '&:hover': { backgroundColor: '#ef444430' } }}>
+            <DeleteIcon fontSize="small" />
+          </IconButton>
+        </Box>
       ),
     },
   ]
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Typography variant="h4">Departments</Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={handleOpen}
-        >
+    <Box>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+        <Box>
+          <Typography variant="h5" sx={{ fontWeight: 700, color: '#1a2332', mb: 0.25 }}>Departments</Typography>
+          <Typography variant="body2" sx={{ color: '#8896a4' }}>Manage departments and teacher assignments</Typography>
+        </Box>
+        <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpen} sx={{ borderRadius: '10px', px: 2.5, textTransform: 'none', fontWeight: 600, backgroundColor: '#2d6a6f', boxShadow: 'none', '&:hover': { backgroundColor: '#235558', boxShadow: 'none' } }}>
           Add Department
         </Button>
-      </div>
+      </Box>
 
-      <Paper style={{ height: 400, width: '100%' }}>
+      <Paper elevation={0} sx={{ border: '1px solid #e8edf2', borderRadius: '16px', overflow: 'hidden' }}>
         <DataGrid
           rows={departments}
           columns={columns}
           pageSize={5}
           rowsPerPageOptions={[5, 10, 20]}
           onRowDoubleClick={handleRowDoubleClick}
+          autoHeight
+          sx={{ border: 'none', '& .MuiDataGrid-columnHeaders': { backgroundColor: '#f8fafc', borderBottom: '1px solid #e8edf2' }, '& .MuiDataGrid-cell': { borderColor: '#f0f4f8', fontSize: '0.87rem' }, '& .MuiDataGrid-row:hover': { backgroundColor: '#f8fafc' }, '& .MuiDataGrid-footerContainer': { borderTop: '1px solid #e8edf2', backgroundColor: '#fafcfe' } }}
         />
       </Paper>
 
-      <Dialog open={open} onClose={handleClose}>
+      <Dialog open={open} onClose={handleClose} PaperProps={{ sx: { borderRadius: '16px' } }}>
         <DialogTitle>{editMode ? 'Edit Department' : 'Add Department'}</DialogTitle>
         <DialogContent>
           <TextField
@@ -261,9 +254,9 @@ export default function Departments() {
             onChange={(e) => setFormData({ ...formData, code: e.target.value })}
           />
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleClose}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={loading}>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={handleClose} sx={{ borderRadius: '8px', textTransform: 'none' }}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={loading} sx={{ borderRadius: '8px', textTransform: 'none', color: '#2d6a6f', fontWeight: 600 }}>
             {editMode ? 'Update' : 'Add'}
           </Button>
         </DialogActions>
@@ -275,6 +268,7 @@ export default function Departments() {
         onClose={handleCloseTeacherDialog}
         maxWidth="md"
         fullWidth
+        PaperProps={{ sx: { borderRadius: '16px' } }}
       >
         <DialogTitle>
           Department: {selectedDepartment?.name}
@@ -316,11 +310,9 @@ export default function Departments() {
                       onClick={() => setSelectedAvailable(teacher)}
                       sx={{
                         '&.Mui-selected': {
-                          backgroundColor: '#1976d2',
+                          backgroundColor: '#2d6a6f',
                           color: 'white',
-                          '&:hover': {
-                            backgroundColor: '#1565c0',
-                          }
+                          '&:hover': { backgroundColor: '#235558' }
                         }
                       }}
                     >
@@ -349,17 +341,17 @@ export default function Departments() {
                 variant="contained"
                 onClick={handleAddTeacher}
                 disabled={!selectedAvailable}
-                sx={{ width: '100%' }}
+                sx={{ width: '100%', borderRadius: '8px', textTransform: 'none', backgroundColor: '#2d6a6f', '&:hover': { backgroundColor: '#235558' }, boxShadow: 'none' }}
               >
-                ADD &gt;&gt;
+                ADD →
               </Button>
               <Button
                 variant="contained"
                 onClick={handleRemoveTeacher}
                 disabled={!selectedDepartment_}
-                sx={{ width: '100%' }}
+                sx={{ width: '100%', borderRadius: '8px', textTransform: 'none', backgroundColor: '#ef4444', '&:hover': { backgroundColor: '#dc2626' }, boxShadow: 'none' }}
               >
-                &lt;&lt; Remove
+                ← Remove
               </Button>
             </Box>
 
@@ -385,11 +377,9 @@ export default function Departments() {
                       onClick={() => setSelectedDepartment_(teacher)}
                       sx={{
                         '&.Mui-selected': {
-                          backgroundColor: '#1976d2',
+                          backgroundColor: '#2d6a6f',
                           color: 'white',
-                          '&:hover': {
-                            backgroundColor: '#1565c0',
-                          }
+                          '&:hover': { backgroundColor: '#235558' }
                         }
                       }}
                     >
@@ -407,15 +397,15 @@ export default function Departments() {
             </Box>
           </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseTeacherDialog} variant="contained">
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={handleCloseTeacherDialog} variant="contained" sx={{ borderRadius: '8px', textTransform: 'none', backgroundColor: '#2d6a6f', boxShadow: 'none', '&:hover': { backgroundColor: '#235558' } }}>
             OK
           </Button>
-          <Button onClick={handleCloseTeacherDialog}>
+          <Button onClick={handleCloseTeacherDialog} sx={{ borderRadius: '8px', textTransform: 'none' }}>
             Cancel
           </Button>
         </DialogActions>
       </Dialog>
-    </div>
+    </Box>
   )
 }

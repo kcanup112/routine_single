@@ -575,95 +575,59 @@ export default function AcademicCalendar() {
     <LocalizationProvider dateAdapter={AdapterDateFns}>
       <Box sx={{ maxWidth: 1400, margin: '0 auto', px: { xs: 2, sm: 3 } }}>
         {/* Header */}
-        <Paper 
-          sx={{ 
-            p: 3, 
-            mb: 3, 
-            borderRadius: 3,
-            background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.1)} 0%, ${alpha(theme.palette.secondary.main, 0.1)} 100%)`,
-            border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
-          }}
-        >
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Box
-                sx={{
-                  p: 1.5,
-                  borderRadius: 2,
-                  backgroundColor: theme.palette.primary.main,
-                  color: 'white',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <EventIcon sx={{ fontSize: 28 }} />
-              </Box>
-              <Box>
-                <Typography variant="h5" fontWeight="bold" color="primary">
-                  Academic Calendar
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Stay organized with your academic schedule
-                </Typography>
-              </Box>
-            </Box>
-            
-            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-              {/* Calendar Type Toggle */}
-              <ToggleButtonGroup
-                value={calendarType}
-                exclusive
-                onChange={(e, newType) => newType && setCalendarType(newType)}
-                size="small"
-                sx={{
-                  backgroundColor: 'white',
-                  '& .MuiToggleButton-root': {
-                    px: 2,
-                    py: 0.5,
-                    fontWeight: 600,
-                    fontSize: '0.85rem',
-                    '&.Mui-selected': {
-                      backgroundColor: theme.palette.primary.main,
-                      color: 'white',
-                      '&:hover': {
-                        backgroundColor: theme.palette.primary.dark,
-                      },
-                    },
-                  },
-                }}
-              >
-                <ToggleButton value="ad">
-                  English (AD)
-                </ToggleButton>
-                <ToggleButton value="bs">
-                  नेपाली (BS)
-                </ToggleButton>
-              </ToggleButtonGroup>
-
-              {canEdit && (
-                <Button
-                  variant="contained"
-                  startIcon={<AddIcon />}
-                  onClick={() => {
-                    resetForm()
-                    setOpenDialog(true)
-                  }}
-                  sx={{
-                    borderRadius: 2,
-                    px: 3,
-                    py: 1,
-                    textTransform: 'none',
-                    fontWeight: 'bold',
-                    boxShadow: 2,
-                  }}
-                >
-                  Add Event
-                </Button>
-              )}
-            </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+          <Box>
+            <Typography variant="h5" sx={{ fontWeight: 700, color: '#1a2332', mb: 0.25 }}>
+              Academic Calendar
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#8896a4' }}>
+              Stay organized with your academic schedule
+            </Typography>
           </Box>
-        </Paper>
+          
+          <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
+            {/* Calendar Type Toggle */}
+            <ToggleButtonGroup
+              value={calendarType}
+              exclusive
+              onChange={(e, newType) => newType && setCalendarType(newType)}
+              size="small"
+              sx={{
+                backgroundColor: 'white',
+                border: '1px solid #e8edf2',
+                borderRadius: '10px',
+                overflow: 'hidden',
+                '& .MuiToggleButton-root': {
+                  px: 2,
+                  py: 0.75,
+                  fontWeight: 600,
+                  fontSize: '0.82rem',
+                  border: 'none',
+                  textTransform: 'none',
+                  '&.Mui-selected': {
+                    backgroundColor: '#2d6a6f',
+                    color: 'white',
+                    '&:hover': { backgroundColor: '#235558' },
+                  },
+                },
+              }}
+            >
+              <ToggleButton value="ad">English (AD)</ToggleButton>
+              <ToggleButton value="bs">नेपाली (BS)</ToggleButton>
+            </ToggleButtonGroup>
+
+            {canEdit && (
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => { resetForm(); setOpenDialog(true) }}
+                sx={{ borderRadius: '10px', px: 2.5, textTransform: 'none', fontWeight: 600, backgroundColor: '#2d6a6f', boxShadow: 'none', '&:hover': { backgroundColor: '#235558', boxShadow: 'none' } }}
+              >
+                Add Event
+              </Button>
+            )}
+          </Box>
+        </Box>
 
         {/* Main Content - Split Layout */}
         <Grid container spacing={3}>
