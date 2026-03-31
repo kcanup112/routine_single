@@ -40,6 +40,7 @@ import MenuBookIcon from '@mui/icons-material/MenuBook'
 import PersonIcon from '@mui/icons-material/Person'
 import GroupsIcon from '@mui/icons-material/Groups'
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh'
+import { useAuth } from '../contexts/AuthContext'
 import { hierarchyService } from '../services/hierarchyService'
 import { semesterSubjectService, teacherSubjectService, semesterService, classService, subjectService, teacherService, classRoutineService } from '../services/index'
 import { buildFlowGraph } from '../utils/buildFlowGraph'
@@ -81,7 +82,7 @@ const miniMapNodeColor = (node) => {
 function parseNodeId(nodeId) {
   if (!nodeId) return {}
   const p = nodeId.split('-')
-  if (p[0] === 'sem')     return { type: 'semester', semesterId: parseInt(p[1]) }
+    if (p[0] === 'sem')     return { type: 'semester', semesterId: parseInt(p[1]), label: school ? 'class' : 'semester' }
   if (p[0] === 'cls')     return { type: 'class',    classId:    parseInt(p[1]) }
   if (p[0] === 'sub')     return { type: 'subject',  classId:    parseInt(p[1]), subjectId:  parseInt(p[2]) }
   if (p[0] === 'teacher') return { type: 'teacher',  classId:    parseInt(p[1]), subjectId:  parseInt(p[2]), teacherId:  parseInt(p[3]) }
@@ -105,6 +106,8 @@ function parseEdgeId(edgeId) {
 }
 
 export default function AcademicHierarchy() {
+  const { isSchool } = useAuth()
+  const school = isSchool()
   const [nodes, setNodes, onNodesChange] = useNodesState([])
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
   const [programmes, setProgrammes] = useState([])
@@ -492,17 +495,19 @@ export default function AcademicHierarchy() {
           </Box>
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-          <Chip label={`${stats.semCount} Semesters`} size="small" sx={{ bgcolor: '#1e3a5f', color: '#fff' }} />
-          <Chip label={`${stats.clsCount} Classes`} size="small" sx={{ bgcolor: '#f3e5f5', color: '#6a1b9a' }} />
+          <Chip label={`${stats.semCount} ${school ? 'Classes' : 'Semesters'}`} size="small" sx={{ bgcolor: '#1e3a5f', color: '#fff' }} />
+          <Chip label={`${stats.clsCount} ${school ? 'Sections' : 'Classes'}`} size="small" sx={{ bgcolor: '#f3e5f5', color: '#6a1b9a' }} />
           <Chip label={`${stats.subCount} Subjects`} size="small" sx={{ bgcolor: '#e3f2fd', color: '#1565c0' }} />
           <Chip label={`${stats.teacherCount} Teachers`} size="small" sx={{ bgcolor: '#e8f5e9', color: '#2e7d32' }} />
-          <FormControl size="small" sx={{ minWidth: 200 }}>
-            <InputLabel>Filter by Programme</InputLabel>
-            <Select value={selectedProgramme} onChange={handleProgrammeChange} label="Filter by Programme">
-              <MenuItem value="">All Programmes</MenuItem>
-              {programmes.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
-            </Select>
-          </FormControl>
+          {!school && (
+            <FormControl size="small" sx={{ minWidth: 200 }}>
+              <InputLabel>Filter by Programme</InputLabel>
+              <Select value={selectedProgramme} onChange={handleProgrammeChange} label="Filter by Programme">
+                <MenuItem value="">All Programmes</MenuItem>
+                {programmes.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
+              </Select>
+            </FormControl>
+          )}
         </Box>
       </Paper>
 

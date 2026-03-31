@@ -51,7 +51,8 @@ class SemesterBase(BaseModel):
     is_active: bool = True
 
 class SemesterCreate(SemesterBase):
-    programme_id: int
+    programme_id: Optional[int] = None
+    department_id: Optional[int] = None  # Used in school mode instead of programme_id
 
 class SemesterUpdate(SemesterBase):
     name: Optional[str] = None
@@ -395,6 +396,7 @@ class TenantSignupRequest(BaseModel):
     # Institution info
     institution_name: str
     subdomain: str  # 3-63 chars, lowercase, alphanumeric + hyphen
+    institution_type: str = "engineering"  # "engineering" or "school"
     
     # Admin user
     admin_name: str
@@ -414,6 +416,7 @@ class TenantSignupRequest(BaseModel):
             "example": {
                 "institution_name": "Kantipur Engineering College",
                 "subdomain": "kec",
+                "institution_type": "engineering",
                 "admin_name": "Admin User",
                 "admin_email": "admin@kec.edu.np",
                 "admin_password": "SecurePass123!",
@@ -432,6 +435,7 @@ class TenantResponse(BaseModel):
     admin_email: str
     status: str
     plan: str
+    institution_type: Optional[str] = "engineering"
     trial_ends_at: Optional[datetime] = None
     created_at: datetime
     

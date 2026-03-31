@@ -43,6 +43,7 @@ export default function SignupPage() {
   const [formData, setFormData] = useState({
     institution_name: '',
     subdomain: '',
+    institution_type: 'engineering',
     admin_name: '',
     admin_email: '',
     admin_password: '',
@@ -187,6 +188,7 @@ export default function SignupPage() {
       const signupData = {
         institution_name: formData.institution_name,
         subdomain: formData.subdomain,
+        institution_type: formData.institution_type,
         admin_name: formData.admin_name,
         admin_email: formData.admin_email,
         admin_password: formData.admin_password,
@@ -288,6 +290,37 @@ export default function SignupPage() {
                 ),
               }}
             />
+
+            {/* Institution Type Selector */}
+            <Typography variant="subtitle2" sx={{ mt: 2, mb: 1, color: 'text.secondary' }}>
+              Institution Type
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 2, mb: 1 }}>
+              {[
+                { value: 'engineering', label: 'Engineering / College', desc: 'Departments → Programmes → Semesters → Classes' },
+                { value: 'school', label: 'School', desc: 'Departments → Classes → Sections' },
+              ].map((opt) => (
+                <Box
+                  key={opt.value}
+                  onClick={() => setFormData(prev => ({ ...prev, institution_type: opt.value }))}
+                  sx={{
+                    flex: 1,
+                    border: formData.institution_type === opt.value ? '2px solid #6366f1' : '2px solid #e2e8f0',
+                    borderRadius: 2,
+                    p: 2,
+                    cursor: 'pointer',
+                    bgcolor: formData.institution_type === opt.value ? 'rgba(99,102,241,0.06)' : 'transparent',
+                    transition: 'all 0.15s',
+                    '&:hover': { borderColor: '#6366f1', bgcolor: 'rgba(99,102,241,0.04)' },
+                  }}
+                >
+                  <Typography variant="subtitle2" fontWeight={600} color={formData.institution_type === opt.value ? 'primary' : 'text.primary'}>
+                    {opt.label}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">{opt.desc}</Typography>
+                </Box>
+              ))}
+            </Box>
 
             <TextField
               fullWidth

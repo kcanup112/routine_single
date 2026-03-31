@@ -261,7 +261,8 @@ def create_tenant_with_schema(
     phone: Optional[str] = None,
     city: Optional[str] = None,
     country: str = "Nepal",
-    plan: str = "trial"
+    plan: str = "trial",
+    institution_type: str = "engineering"
 ) -> Tuple[Optional[Tenant], Optional[User], Optional[str]]:
     """
     Create tenant with schema and admin user
@@ -304,7 +305,8 @@ def create_tenant_with_schema(
                 "time_zone": "Asia/Kathmandu",
                 "locale": "en-US",
                 "calendar_type": "ad",
-                "academic_year_start_month": 8
+                "academic_year_start_month": 8,
+                "institution_type": institution_type
             },
             max_teachers=50 if plan == 'trial' else 100,
             max_students=500 if plan == 'trial' else 2000,

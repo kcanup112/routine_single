@@ -1,8 +1,35 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from app.models import models
 from app.schemas import schemas
 from typing import List, Optional
 from datetime import datetime, time, timedelta
+
+
+def get_institution_type(db: Session) -> str:
+    """
+    Return the institution_type for the current tenant.
+    Reads the schema from the active search_path, then queries public.tenants.
+    Falls back to "engineering" if not found.
+    """
+    try:
+        result = db.execute(text("SELECT current_schema()")).scalar()
+        schema_name = result if result and result != "public" else None
+        if not schema_name:
+            return "engineering"
+        from app.models.models_saas import Tenant
+        tenant = db.execute(
+            text("SELECT settings FROM public.tenants WHERE schema_name = :s"),
+            {"s": schema_name}
+        ).fetchone()
+        if tenant and tenant[0]:
+            settings = tenant[0]
+            if isinstance(settings, dict):
+                return settings.get("institution_type", "engineering")
+    except Exception:
+        pass
+    return "engineering"
+
 
 class DepartmentService:
     @staticmethod
@@ -11,6 +38,20 @@ class DepartmentService:
         db.add(db_department)
         db.commit()
         db.refresh(db_department)
+        # School mode: auto-create a hidden default Programme for this department
+        if get_institution_type(db) == "school":
+            existing = db.query(models.Programme).filter(
+                models.Programme.department_id == db_department.id,
+                models.Programme.code == "DEFAULT"
+            ).first()
+            if not existing:
+                default_prog = models.Programme(
+                    department_id=db_department.id,
+                    name="Default",
+                    code="DEFAULT",
+                )
+                db.add(default_prog)
+                db.commit()
         return db_department
     
     @staticmethod
@@ -203,7 +244,23 @@ class ClassService:
 class SemesterService:
     @staticmethod
     def create(db: Session, semester: schemas.SemesterCreate):
-        db_semester = models.Semester(**semester.dict())
+        data = semester.dict()
+        department_id = data.pop("department_id", None)
+        # School mode: resolve programme_id from the department's default programme
+        if not data.get("programme_id") and department_id:
+            prog = db.query(models.Programme).filter(
+                models.Programme.department_id == department_id,
+                models.Programme.code == "DEFAULT"
+            ).first()
+            if not prog:
+                raise ValueError(
+                    f"No default programme found for department {department_id}. "
+                    "Please ensure the department was created in school mode."
+                )
+            data["programme_id"] = prog.id
+        if not data.get("programme_id"):
+            raise ValueError("programme_id is required (or department_id for school mode)")
+        db_semester = models.Semester(**data)
         db.add(db_semester)
         db.commit()
         db.refresh(db_semester)
@@ -220,6 +277,16 @@ class SemesterService:
     @staticmethod
     def get_by_programme(db: Session, programme_id: int):
         return db.query(models.Semester).filter(models.Semester.programme_id == programme_id).all()
+
+    @staticmethod
+    def get_by_department(db: Session, department_id: int):
+        """School mode: return all semesters (classes) belonging to a department."""
+        return (
+            db.query(models.Semester)
+            .join(models.Programme, models.Semester.programme_id == models.Programme.id)
+            .filter(models.Programme.department_id == department_id)
+            .all()
+        )
     
     @staticmethod
     def update(db: Session, semester_id: int, semester: schemas.SemesterUpdate):
@@ -968,10 +1035,16 @@ class RoutineGeneratorService:
 
         # ── legacy greedy algorithm ─────────────────────────────────────
         return RoutineGeneratorService._greedy(db, assignments)
-
     @staticmethod
     def _greedy(db, assignments: list) -> dict:
         from collections import defaultdict
+
+        # Determine block strategy for school vs engineering
+        _block_fn = (
+            (lambda load: [1] * int(load))
+            if get_institution_type(db) == "school"
+            else RoutineGeneratorService._plan_blocks
+        )
 
         # 1. Working days ordered by day_number
         days = (db.query(models.Day)
@@ -1094,7 +1167,7 @@ class RoutineGeneratorService:
                     if load == 0:
                         continue
 
-                    blocks = RoutineGeneratorService._plan_blocks(load)
+                    blocks = _block_fn(load)
                     subject_placed = 0
 
                     for block_size in blocks:

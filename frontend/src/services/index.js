@@ -24,6 +24,7 @@ export const semesterService = {
   getAll: () => api.get('/semesters/'),
   getById: (id) => api.get(`/semesters/${id}/`),
   getByProgramme: (programmeId) => api.get(`/semesters/programme/${programmeId}/`),
+  getByDepartment: (departmentId) => api.get(`/semesters/?department_id=${departmentId}`),
   create: (data) => api.post('/semesters/', data),
   update: (id, data) => api.put(`/semesters/${id}/`, data),
   delete: (id) => api.delete(`/semesters/${id}/`),

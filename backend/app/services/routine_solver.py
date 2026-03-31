@@ -48,6 +48,11 @@ def _plan_blocks(load: int) -> List[int]:
     return blocks
 
 
+def _plan_blocks_school(load: int) -> List[int]:
+    """School mode: load → [1, 1, …] (every period is a single-slot block)."""
+    return [1] * int(load)
+
+
 # ── main solver ─────────────────────────────────────────────────────────
 
 class CPSATRoutineSolver:
@@ -58,6 +63,9 @@ class CPSATRoutineSolver:
         Drop-in replacement for ``RoutineGeneratorService.generate``.
         Same input shape, same response shape.
         """
+        # Determine block strategy based on institution type
+        from app.services.crud import get_institution_type
+        _block_fn = _plan_blocks_school if get_institution_type(db) == "school" else _plan_blocks
 
         # ── 1. load days & periods ──────────────────────────────────────
         days = (
@@ -202,7 +210,7 @@ class CPSATRoutineSolver:
                     if remaining == 0:
                         continue
 
-                    for bsize in _plan_blocks(remaining):
+                    for bsize in _block_fn(remaining):
                         blocks.append(
                             {
                                 "idx": len(blocks),

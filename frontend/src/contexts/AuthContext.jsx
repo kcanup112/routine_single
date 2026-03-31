@@ -55,6 +55,7 @@ export const AuthProvider = ({ children }) => {
   const isSuperAdmin = () => hasRole('super_admin');
   const isAdmin = () => hasRole(['super_admin', 'admin']);
   const isTeacher = () => hasRole('teacher');
+  const isSchool = () => user?.institution_type === 'school';
 
   const value = {
     user,
@@ -65,6 +66,7 @@ export const AuthProvider = ({ children }) => {
     isSuperAdmin,
     isAdmin,
     isTeacher,
+    isSchool,
     isAuthenticated: !!user,
   };
 

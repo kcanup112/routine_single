@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useAuth } from '../contexts/AuthContext'
 import {
   Typography,
   Button,
@@ -19,11 +20,14 @@ import {
 } from '@mui/material'
 import { DataGrid } from '@mui/x-data-grid'
 import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material'
-import { semesterService, programmeService, subjectService, semesterSubjectService } from '../services'
+import { semesterService, programmeService, subjectService, semesterSubjectService, departmentService } from '../services'
 
 export default function Semesters() {
+  const { isSchool } = useAuth()
+  const school = isSchool()
   const [semesters, setSemesters] = useState([])
   const [programmes, setProgrammes] = useState([])
+  const [departments, setDepartments] = useState([])
   const [allSubjects, setAllSubjects] = useState([])
   const [open, setOpen] = useState(false)
   const [subjectDialogOpen, setSubjectDialogOpen] = useState(false)
@@ -39,6 +43,7 @@ export default function Semesters() {
     name: '',
     semester_number: 1,
     programme_id: '',
+    department_id: '',  // used in school mode
     is_active: true,
   })
   const [loading, setLoading] = useState(false)
@@ -61,6 +66,15 @@ export default function Semesters() {
     }
   }
 
+  const loadDepartments = async () => {
+    try {
+      const response = await departmentService.getAll()
+      setDepartments(response.data)
+    } catch (error) {
+      console.error('Error loading departments:', error)
+    }
+  }
+
   const loadSubjects = async () => {
     try {
       const response = await subjectService.getAll()
@@ -72,8 +86,13 @@ export default function Semesters() {
 
   useEffect(() => {
     loadSemesters()
-    loadProgrammes()
     loadSubjects()
+    if (school) {
+      loadDepartments()
+      loadProgrammes()  // needed for department name lookup in column renderer
+    } else {
+      loadProgrammes()
+    }
   }, [])
 
   const handleOpen = () => {
@@ -86,7 +105,7 @@ export default function Semesters() {
     setOpen(false)
     setEditMode(false)
     setEditId(null)
-    setFormData({ name: '', semester_number: 1, programme_id: '', is_active: true })
+    setFormData({ name: '', semester_number: 1, programme_id: '', department_id: '', is_active: true })
   }
 
   const handleEdit = (semester) => {
@@ -96,6 +115,7 @@ export default function Semesters() {
       name: semester.name,
       semester_number: semester.semester_number,
       programme_id: semester.programme_id || '',
+      department_id: '',
       is_active: semester.is_active,
     })
     setOpen(true)
@@ -104,10 +124,19 @@ export default function Semesters() {
   const handleSubmit = async () => {
     setLoading(true)
     try {
+      // Build payload — school mode sends department_id; engineering sends programme_id
+      const payload = {
+        name: formData.name,
+        semester_number: formData.semester_number,
+        is_active: formData.is_active,
+        ...(school
+          ? { department_id: formData.department_id }
+          : { programme_id: formData.programme_id }),
+      }
       if (editMode) {
-        await semesterService.update(editId, formData)
+        await semesterService.update(editId, payload)
       } else {
-        await semesterService.create(formData)
+        await semesterService.create(payload)
       }
       await loadSemesters()
       handleClose()
@@ -118,7 +147,7 @@ export default function Semesters() {
   }
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this semester?')) {
+    if (window.confirm(`Are you sure you want to delete this ${school ? 'class' : 'semester'}?`)) {
       try {
         await semesterService.delete(id)
         await loadSemesters()
@@ -208,15 +237,23 @@ export default function Semesters() {
     return prog ? `${prog.code} - ${prog.name}` : 'N/A'
   }
 
+  const getDepartmentName = (programmeId) => {
+    // For school mode: resolve department via the programme
+    const prog = programmes.find(p => p.id === programmeId)
+    if (!prog) return 'N/A'
+    const dept = departments.find(d => d.id === prog.department_id)
+    return dept ? dept.name : 'N/A'
+  }
+
   const columns = [
     { field: 'id', headerName: 'ID', width: 70 },
-    { field: 'name', headerName: 'Semester', width: 150 },
-    { field: 'semester_number', headerName: 'Semester #', width: 120 },
+    { field: 'name', headerName: school ? 'Class' : 'Semester', width: 150 },
+    { field: 'semester_number', headerName: school ? 'Class No.' : 'Semester #', width: 120 },
     {
       field: 'programme_id',
-      headerName: 'Programme',
+      headerName: school ? 'Department' : 'Programme',
       width: 250,
-      renderCell: (params) => getProgrammeName(params.value),
+      renderCell: (params) => school ? getDepartmentName(params.value) : getProgrammeName(params.value),
     },
     {
       field: 'is_active',
@@ -245,11 +282,11 @@ export default function Semesters() {
     <Box>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 2 }}>
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700, color: '#1a2332', mb: 0.25 }}>Semesters</Typography>
-          <Typography variant="body2" sx={{ color: '#8896a4' }}>Manage semesters and subject assignments (double-click to assign subjects)</Typography>
+          <Typography variant="h5" sx={{ fontWeight: 700, color: '#1a2332', mb: 0.25 }}>{school ? 'Classes' : 'Semesters'}</Typography>
+          <Typography variant="body2" sx={{ color: '#8896a4' }}>Manage {school ? 'classes' : 'semesters'} and subject assignments (double-click to assign subjects)</Typography>
         </Box>
         <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpen} sx={{ borderRadius: '10px', px: 2.5, textTransform: 'none', fontWeight: 600, backgroundColor: '#2d6a6f', boxShadow: 'none', '&:hover': { backgroundColor: '#235558', boxShadow: 'none' } }}>
-          Add Semester
+          Add {school ? 'Class' : 'Semester'}
         </Button>
       </Box>
 
@@ -266,38 +303,55 @@ export default function Semesters() {
       </Paper>
 
       <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: '16px' } }}>
-        <DialogTitle>{editMode ? 'Edit Semester' : 'Add Semester'}</DialogTitle>
+        <DialogTitle>{editMode ? `Edit ${school ? 'Class' : 'Semester'}` : `Add ${school ? 'Class' : 'Semester'}`}</DialogTitle>
         <DialogContent>
-          <TextField
-            select
-            margin="dense"
-            label="Programme"
-            fullWidth
-            value={formData.programme_id}
-            onChange={(e) => setFormData({ ...formData, programme_id: e.target.value })}
-          >
-            {programmes.map((prog) => (
-              <MenuItem key={prog.id} value={prog.id}>
-                {prog.code} - {prog.name}
-              </MenuItem>
-            ))}
-          </TextField>
+          {school ? (
+            <TextField
+              select
+              margin="dense"
+              label="Department"
+              fullWidth
+              value={formData.department_id}
+              onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
+            >
+              {departments.map((dept) => (
+                <MenuItem key={dept.id} value={dept.id}>
+                  {dept.name}
+                </MenuItem>
+              ))}
+            </TextField>
+          ) : (
+            <TextField
+              select
+              margin="dense"
+              label="Programme"
+              fullWidth
+              value={formData.programme_id}
+              onChange={(e) => setFormData({ ...formData, programme_id: e.target.value })}
+            >
+              {programmes.map((prog) => (
+                <MenuItem key={prog.id} value={prog.id}>
+                  {prog.code} - {prog.name}
+                </MenuItem>
+              ))}
+            </TextField>
+          )}
           <TextField
             autoFocus
             margin="dense"
-            label="Semester Name"
-            placeholder="e.g., BCT I/I"
+            label={school ? 'Class Name' : 'Semester Name'}
+            placeholder={school ? 'e.g., Grade 8' : 'e.g., BCT I/I'}
             fullWidth
-            helperText="Format: [Programme Code] [Year]/[Part] (e.g., BCT I/I, BCT I/II, BCT II/I)"
+            helperText={school ? 'Name of the class/grade' : 'Format: [Programme Code] [Year]/[Part] (e.g., BCT I/I, BCT I/II, BCT II/I)'}
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
           />
           <TextField
             margin="dense"
-            label="Semester Number"
+            label={school ? 'Class Number' : 'Semester Number'}
             type="number"
             fullWidth
-            helperText="1 for I/I, 2 for I/II, 3 for II/I, etc."
+            helperText={school ? 'Grade/class order number' : '1 for I/I, 2 for I/II, 3 for II/I, etc.'}
             value={formData.semester_number}
             onChange={(e) =>
               setFormData({ ...formData, semester_number: parseInt(e.target.value) })
@@ -310,7 +364,7 @@ export default function Semesters() {
                 onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
               />
             }
-            label="Active Semester"
+            label={school ? 'Active Class' : 'Active Semester'}
           />
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useAuth } from '../contexts/AuthContext'
 import {
   Typography,
   Button,
@@ -20,6 +21,8 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import { DatePicker } from '@mui/x-date-pickers/DatePicker'
 
 export default function Classes() {
+  const { isSchool } = useAuth()
+  const school = isSchool()
   const [classes, setClasses] = useState([])
   const [semesters, setSemesters] = useState([])
   const [departments, setDepartments] = useState([])
@@ -179,7 +182,7 @@ export default function Classes() {
   }
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this class?')) {
+    if (window.confirm(`Are you sure you want to delete this ${school ? 'section' : 'class'}?`)) {
       try {
         await classService.delete(id)
         await loadClasses()
@@ -191,9 +194,9 @@ export default function Classes() {
 
   const columns = [
     { field: 'id', headerName: 'ID', width: 70 },
-    { field: 'name', headerName: 'Class Name', width: 200 },
+    { field: 'name', headerName: school ? 'Section Name' : 'Class Name', width: 200 },
     { field: 'section', headerName: 'Section', width: 100 },
-    { field: 'semester_name', headerName: 'Semester', width: 150 },
+    { field: 'semester_name', headerName: school ? 'Class' : 'Semester', width: 150 },
     { field: 'department_name', headerName: 'Department', width: 150 },
     { field: 'shift_name', headerName: 'Shift', width: 130 },
     { field: 'room_no', headerName: 'Room No.', width: 120 },
@@ -219,11 +222,11 @@ export default function Classes() {
     <Box>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 2 }}>
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 700, color: '#1a2332', mb: 0.25 }}>Classes</Typography>
-          <Typography variant="body2" sx={{ color: '#8896a4' }}>Manage class groups, sections and room assignments</Typography>
+          <Typography variant="h5" sx={{ fontWeight: 700, color: '#1a2332', mb: 0.25 }}>{school ? 'Sections' : 'Classes'}</Typography>
+          <Typography variant="body2" sx={{ color: '#8896a4' }}>Manage {school ? 'sections' : 'class groups, sections'} and room assignments</Typography>
         </Box>
         <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpen} sx={{ borderRadius: '10px', px: 2.5, textTransform: 'none', fontWeight: 600, backgroundColor: '#2d6a6f', boxShadow: 'none', '&:hover': { backgroundColor: '#235558', boxShadow: 'none' } }}>
-          Add Class
+          Add {school ? 'Section' : 'Class'}
         </Button>
       </Box>
 
@@ -240,12 +243,12 @@ export default function Classes() {
       </Paper>
 
       <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: '16px' } }}>
-        <DialogTitle>{editMode ? 'Edit Class' : 'Add New Class'}</DialogTitle>
+        <DialogTitle>{editMode ? `Edit ${school ? 'Section' : 'Class'}` : `Add New ${school ? 'Section' : 'Class'}`}</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
             margin="dense"
-            label="Class Name"
+            label={school ? 'Section Name' : 'Class Name'}
             fullWidth
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -281,7 +284,7 @@ export default function Classes() {
           <TextField
             select
             margin="dense"
-            label="Semester"
+            label={school ? 'Class' : 'Semester'}
             fullWidth
             value={formData.semester_id}
             onChange={(e) => setFormData({ ...formData, semester_id: e.target.value })}

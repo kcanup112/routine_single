@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from app.core.database_saas import get_db
 from app.schemas import schemas
 from app.services.crud import SemesterService
@@ -9,10 +9,15 @@ router = APIRouter(prefix="/semesters", tags=["semesters"])
 
 @router.post("/", response_model=schemas.Semester)
 def create_semester(semester: schemas.SemesterCreate, db: Session = Depends(get_db)):
-    return SemesterService.create(db, semester)
+    try:
+        return SemesterService.create(db, semester)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/", response_model=List[schemas.Semester])
-def get_semesters(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def get_semesters(skip: int = 0, limit: int = 100, department_id: Optional[int] = None, db: Session = Depends(get_db)):
+    if department_id is not None:
+        return SemesterService.get_by_department(db, department_id)
     return SemesterService.get_all(db, skip, limit)
 
 @router.get("/{semester_id}/", response_model=schemas.Semester)

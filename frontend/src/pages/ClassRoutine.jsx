@@ -61,8 +61,9 @@ function TabPanel({ children, value, index }) {
 }
 
 export default function ClassRoutine() {
-  const { isAdmin, isAuthenticated } = useAuth()
+  const { isAdmin, isAuthenticated, isSchool } = useAuth()
   const canEdit = isAuthenticated && isAdmin()
+  const school = isSchool()
   const [tabValue, setTabValue] = useState(0)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const fullscreenRef = React.useRef(null)
@@ -111,6 +112,7 @@ export default function ClassRoutine() {
   
   // Form data
   const [programmes, setProgrammes] = useState([])
+  const [departments, setDepartments] = useState([])
   const [semesters, setSemesters] = useState([])
   const [classes, setClasses] = useState([])
   const [rooms, setRooms] = useState([])
@@ -121,7 +123,8 @@ export default function ClassRoutine() {
   const [teachers, setTeachers] = useState([])
   
   const [formData, setFormData] = useState({
-    programme_id: '',
+    programme_id: '',   // engineering mode
+    department_id: '',  // school mode
     semester_id: '',
     class_id: '',
     section: '',
@@ -246,6 +249,15 @@ export default function ClassRoutine() {
       loadSemesters(formData.programme_id)
     }
   }, [formData.programme_id])
+
+  // School mode: load semesters (classes) when department changes
+  useEffect(() => {
+    if (school && formData.department_id) {
+      semesterService.getByDepartment(formData.department_id).then(res => {
+        setSemesters(res.data)
+      }).catch(e => console.error('Error loading classes for department:', e))
+    }
+  }, [formData.department_id])
 
   useEffect(() => {
     if (formData.semester_id) {
@@ -471,6 +483,16 @@ export default function ClassRoutine() {
       // setPeriods will be loaded when class is selected
       setSubjects(subjectRes.data)
       setTeachers(teacherRes.data)
+      // School mode: also fetch departments
+      if (school) {
+        try {
+          const { departmentService } = await import('../services')
+          const deptRes = await departmentService.getAll()
+          setDepartments(deptRes.data)
+        } catch (e) {
+          console.error('Error loading departments:', e)
+        }
+      }
     } catch (error) {
       console.error('Error loading data:', error)
     }
@@ -2992,6 +3014,10 @@ export default function ClassRoutine() {
   }
 
   const getProgrammeName = () => {
+    if (school) {
+      const dept = departments.find(d => d.id === formData.department_id)
+      return dept ? dept.name : ''
+    }
     const prog = programmes.find(p => p.id === formData.programme_id)
     return prog ? prog.code : ''
   }
@@ -3063,43 +3089,70 @@ export default function ClassRoutine() {
               }}
             >
               <Grid container spacing={{ xs: 1.5, sm: 2 }} alignItems="center">
-                <Grid item xs={12} sm={6} md={3}>
-                  <TextField
-                    select
-                    fullWidth
-                    size="small"
-                    label="Programme"
-                    value={formData.programme_id}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      programme_id: e.target.value,
-                      semester_id: '',
-                      class_id: '',
-                    })}
-                    required
-                  >
-                    <MenuItem value="">Select Programme</MenuItem>
-                    {programmes.map((prog) => (
-                      <MenuItem key={prog.id} value={prog.id}>
-                        {prog.code}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Grid>
+                {/* Engineering mode: Programme selector | School mode: Department selector */}
+                {!school ? (
+                  <Grid item xs={12} sm={6} md={3}>
+                    <TextField
+                      select
+                      fullWidth
+                      size="small"
+                      label="Programme"
+                      value={formData.programme_id}
+                      onChange={(e) => setFormData({ 
+                        ...formData, 
+                        programme_id: e.target.value,
+                        semester_id: '',
+                        class_id: '',
+                      })}
+                      required
+                    >
+                      <MenuItem value="">Select Programme</MenuItem>
+                      {programmes.map((prog) => (
+                        <MenuItem key={prog.id} value={prog.id}>
+                          {prog.code}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+                ) : (
+                  <Grid item xs={12} sm={6} md={3}>
+                    <TextField
+                      select
+                      fullWidth
+                      size="small"
+                      label="Department"
+                      value={formData.department_id}
+                      onChange={(e) => setFormData({ 
+                        ...formData, 
+                        department_id: e.target.value,
+                        semester_id: '',
+                        class_id: '',
+                      })}
+                      required
+                    >
+                      <MenuItem value="">Select Department</MenuItem>
+                      {departments.map((dept) => (
+                        <MenuItem key={dept.id} value={dept.id}>
+                          {dept.name}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+                )}
 
                 <Grid item xs={12} sm={6} md={2}>
                   <TextField
                     select
                     fullWidth
                     size="small"
-                    label="Year/Part"
+                    label={school ? 'Class' : 'Year/Part'}
                     value={formData.semester_id}
                     onChange={(e) => setFormData({ 
                       ...formData, 
                       semester_id: e.target.value,
                       class_id: '',
                     })}
-                    disabled={!formData.programme_id}
+                    disabled={school ? !formData.department_id : !formData.programme_id}
                     required
                   >
                     <MenuItem value="">Select</MenuItem>
@@ -3116,7 +3169,7 @@ export default function ClassRoutine() {
                     select
                     fullWidth
                     size="small"
-                    label="Class"
+                    label={school ? 'Section' : 'Class'}
                     value={formData.class_id}
                     onChange={async (e) => {
                       const selectedClass = classes.find(c => c.id === e.target.value)
@@ -3212,7 +3265,7 @@ export default function ClassRoutine() {
             </Paper>
 
             {/* Routine Table */}
-            {formData.programme_id && formData.class_id && (
+            {(school ? formData.department_id : formData.programme_id) && formData.class_id && (
               <Box 
                 ref={fullscreenRef}
                 sx={{ 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate, Outlet } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
@@ -58,39 +58,42 @@ import {
 
 const drawerWidth = 240
 
-const menuSections = [
-  {
-    title: 'Academic Setup',
-    icon: <AcademicIcon />,
-    items: [
-      { text: 'Departments', icon: <DepartmentIcon />, path: '/dashboard/departments' },
-      { text: 'Programmes', icon: <ProgrammeIcon />, path: '/dashboard/programmes' },
-      { text: 'Semesters', icon: <SemesterIcon />, path: '/dashboard/semesters' },
-      { text: 'Classes', icon: <ClassIcon />, path: '/dashboard/classes' },
-    ]
-  },
-  {
-    title: 'Resources',
-    icon: <SettingsIcon />,
-    items: [
-      { text: 'Teachers', icon: <TeacherIcon />, path: '/dashboard/teachers' },
-      { text: 'Subjects', icon: <SubjectIcon />, path: '/dashboard/subjects' },
-      { text: 'Days', icon: <DayIcon />, path: '/dashboard/days' },
-      { text: 'Shifts', icon: <ShiftIcon />, path: '/dashboard/shifts' },
-      { text: 'Rooms', icon: <RoomIcon />, path: '/dashboard/rooms' },
-      { text: 'Periods', icon: <PeriodIcon />, path: '/dashboard/periods' },
-    ]
-  },
-  {
-    title: 'Routine',
-    icon: <RoutineIcon />,
-    items: [
-      { text: 'Class Routine', icon: <ClassRoutineIcon />, path: '/dashboard/class-routine' },
-      { text: 'Teacher Routine', icon: <TeacherRoutineIcon />, path: '/dashboard/teacher-routine' },
-      { text: 'Academic Hierarchy', icon: <HierarchyIcon />, path: '/dashboard/academic-hierarchy' },
-    ]
-  },
-]
+function buildMenuSections(school) {
+  return [
+    {
+      title: 'Academic Setup',
+      icon: <AcademicIcon />,
+      items: [
+        { text: 'Departments', icon: <DepartmentIcon />, path: '/dashboard/departments' },
+        // Programmes only visible in engineering mode
+        ...(!school ? [{ text: 'Programmes', icon: <ProgrammeIcon />, path: '/dashboard/programmes' }] : []),
+        { text: school ? 'Classes' : 'Semesters', icon: <SemesterIcon />, path: '/dashboard/semesters' },
+        { text: school ? 'Sections' : 'Classes', icon: <ClassIcon />, path: '/dashboard/classes' },
+      ]
+    },
+    {
+      title: 'Resources',
+      icon: <SettingsIcon />,
+      items: [
+        { text: 'Teachers', icon: <TeacherIcon />, path: '/dashboard/teachers' },
+        { text: 'Subjects', icon: <SubjectIcon />, path: '/dashboard/subjects' },
+        { text: 'Days', icon: <DayIcon />, path: '/dashboard/days' },
+        { text: 'Shifts', icon: <ShiftIcon />, path: '/dashboard/shifts' },
+        { text: 'Rooms', icon: <RoomIcon />, path: '/dashboard/rooms' },
+        { text: 'Periods', icon: <PeriodIcon />, path: '/dashboard/periods' },
+      ]
+    },
+    {
+      title: 'Routine',
+      icon: <RoutineIcon />,
+      items: [
+        { text: 'Class Routine', icon: <ClassRoutineIcon />, path: '/dashboard/class-routine' },
+        { text: 'Teacher Routine', icon: <TeacherRoutineIcon />, path: '/dashboard/teacher-routine' },
+        { text: 'Academic Hierarchy', icon: <HierarchyIcon />, path: '/dashboard/academic-hierarchy' },
+      ]
+    },
+  ]
+}
 
 export default function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -102,7 +105,8 @@ export default function Layout() {
   const [sidebarVisible, setSidebarVisible] = useState(true)
   const [anchorEl, setAnchorEl] = useState(null)
   const navigate = useNavigate()
-  const { user, logout, isAdmin, isAuthenticated } = useAuth()
+  const { user, logout, isAdmin, isAuthenticated, isSchool } = useAuth()
+  const menuSections = useMemo(() => buildMenuSections(isSchool()), [user])
 
   const handleMenu = (event) => {
     setAnchorEl(event.currentTarget)

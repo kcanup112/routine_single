@@ -28,6 +28,7 @@ class UserInfo(BaseModel):
     role: str
     tenant_subdomain: str
     tenant_name: str
+    institution_type: Optional[str] = "engineering"
 
 
 class LoginResponse(BaseModel):
@@ -104,7 +105,8 @@ def login(credentials: LoginRequest, db: Session = Depends(get_db)):
             "full_name": user.full_name,
             "role": user.role,
             "tenant_subdomain": tenant.subdomain,
-            "tenant_name": tenant.name
+            "tenant_name": tenant.name,
+            "institution_type": (tenant.settings or {}).get("institution_type", "engineering")
         }
     }
 
@@ -135,7 +137,8 @@ def get_current_user_info(current_user: User = Depends(get_current_user), db: Se
         "full_name": current_user.full_name,
         "role": current_user.role,
         "tenant_subdomain": tenant.subdomain,
-        "tenant_name": tenant.name
+        "tenant_name": tenant.name,
+        "institution_type": (tenant.settings or {}).get("institution_type", "engineering")
     }
 
 

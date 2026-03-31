@@ -64,7 +64,8 @@ async def signup_tenant(
         phone=signup_data.phone,
         city=signup_data.city,
         country=signup_data.country,
-        plan=signup_data.plan
+        plan=signup_data.plan,
+        institution_type=signup_data.institution_type
     )
     
     if error:
@@ -103,6 +104,7 @@ async def signup_tenant(
         admin_email=tenant.admin_email,
         status=tenant.status,
         plan=tenant.plan,
+        institution_type=(tenant.settings or {}).get("institution_type", "engineering"),
         trial_ends_at=tenant.trial_ends_at,
         created_at=tenant.created_at
     )
