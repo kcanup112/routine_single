@@ -15,7 +15,7 @@ import {
   IconButton,
 } from '@mui/material'
 import { DataGrid } from '@mui/x-data-grid'
-import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material'
+import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, PersonAdd as PersonAddIcon } from '@mui/icons-material'
 import { departmentService, teacherService } from '../services'
 
 export default function Departments() {
@@ -197,9 +197,12 @@ export default function Departments() {
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 200,
+      width: 250,
       renderCell: (params) => (
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+          <IconButton size="small" onClick={() => handleRowDoubleClick({ row: params.row })} title="Add Teacher" sx={{ color: '#1976d2', backgroundColor: '#1976d218', borderRadius: '8px', p: '5px', '&:hover': { backgroundColor: '#1976d230' } }}>
+            <PersonAddIcon fontSize="small" />
+          </IconButton>
           <IconButton size="small" onClick={() => handleEdit(params.row)} sx={{ color: '#2d6a6f', backgroundColor: '#2d6a6f18', borderRadius: '8px', p: '5px', '&:hover': { backgroundColor: '#2d6a6f30' } }}>
             <EditIcon fontSize="small" />
           </IconButton>

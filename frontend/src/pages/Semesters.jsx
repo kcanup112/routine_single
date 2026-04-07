@@ -19,7 +19,7 @@ import {
   IconButton,
 } from '@mui/material'
 import { DataGrid } from '@mui/x-data-grid'
-import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material'
+import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, LibraryAdd as LibraryAddIcon } from '@mui/icons-material'
 import { semesterService, programmeService, subjectService, semesterSubjectService, departmentService } from '../services'
 
 export default function Semesters() {
@@ -264,9 +264,12 @@ export default function Semesters() {
     {
       field: 'actions',
       headerName: 'Actions',
-      width: 200,
+      width: 250,
       renderCell: (params) => (
         <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+          <IconButton size="small" onClick={() => handleRowDoubleClick({ row: params.row })} title={school ? 'Add Subject' : 'Add Subject'} sx={{ color: '#1976d2', backgroundColor: '#1976d218', borderRadius: '8px', p: '5px', '&:hover': { backgroundColor: '#1976d230' } }}>
+            <LibraryAddIcon fontSize="small" />
+          </IconButton>
           <IconButton size="small" onClick={() => handleEdit(params.row)} sx={{ color: '#2d6a6f', backgroundColor: '#2d6a6f18', borderRadius: '8px', p: '5px', '&:hover': { backgroundColor: '#2d6a6f30' } }}>
             <EditIcon fontSize="small" />
           </IconButton>
@@ -283,7 +286,7 @@ export default function Semesters() {
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 2 }}>
         <Box>
           <Typography variant="h5" sx={{ fontWeight: 700, color: '#1a2332', mb: 0.25 }}>{school ? 'Classes' : 'Semesters'}</Typography>
-          <Typography variant="body2" sx={{ color: '#8896a4' }}>Manage {school ? 'classes' : 'semesters'} and subject assignments (double-click to assign subjects)</Typography>
+          <Typography variant="body2" sx={{ color: '#8896a4' }}>Manage {school ? 'classes' : 'semesters'} and subject assignments</Typography>
         </Box>
         <Button variant="contained" startIcon={<AddIcon />} onClick={handleOpen} sx={{ borderRadius: '10px', px: 2.5, textTransform: 'none', fontWeight: 600, backgroundColor: '#2d6a6f', boxShadow: 'none', '&:hover': { backgroundColor: '#235558', boxShadow: 'none' } }}>
           Add {school ? 'Class' : 'Semester'}
