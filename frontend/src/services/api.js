@@ -52,12 +52,11 @@ api.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
     
-    // Add tenant subdomain header for multi-tenant support
-    // Skip for public endpoints like login and tenant signup
-    const isPublicEndpoint = config.url?.includes('/auth/login') || 
-                             config.url?.includes('/api/tenants');
-    
-    if (!isPublicEndpoint) {
+    // Add tenant subdomain header for multi-tenant support.
+    // Keep tenant signup public, but include tenant header for login if available.
+    const isTenantSignupEndpoint = config.url?.includes('/api/tenants');
+
+    if (!isTenantSignupEndpoint) {
       const subdomain = getSubdomain();
       if (subdomain) {
         config.headers['X-Tenant-Subdomain'] = subdomain;

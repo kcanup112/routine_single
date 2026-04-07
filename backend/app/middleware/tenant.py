@@ -157,13 +157,14 @@ async def tenant_context_middleware(request: Request, call_next):
     from app.core.database_saas import SessionLocal, _tenant_schema_ctx
     db = SessionLocal()
     
+    ctx_token = None
     try:
         # Get tenant from request
         tenant = await get_tenant_from_request(request, db)
         
         if tenant:
             # Set tenant schema context using ContextVar
-            _tenant_schema_ctx.set(tenant.schema_name)
+            ctx_token = _tenant_schema_ctx.set(tenant.schema_name)
             
             # Set PostgreSQL search_path to tenant schema
             set_tenant_schema(db, tenant.schema_name)
@@ -175,7 +176,7 @@ async def tenant_context_middleware(request: Request, call_next):
         else:
             # Public endpoints (signup, health check, etc.)
             request.state.tenant = None
-            _tenant_schema_ctx.set(None)
+            ctx_token = _tenant_schema_ctx.set(None)
         
         # Process request
         response = await call_next(request)
@@ -205,4 +206,7 @@ async def tenant_context_middleware(request: Request, call_next):
         if db:
             db.close()
         # Clear context variable
-        _tenant_schema_ctx.set(None)
+        if ctx_token is not None:
+            _tenant_schema_ctx.reset(ctx_token)
+        else:
+            _tenant_schema_ctx.set(None)

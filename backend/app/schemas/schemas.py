@@ -87,6 +87,7 @@ class ClassBase(BaseModel):
 
 class ClassCreate(ClassBase):
     semester_id: int
+    shift_id: int
 
 class ClassUpdate(BaseModel):
     name: Optional[str] = None

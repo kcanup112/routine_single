@@ -4,7 +4,7 @@ Business logic for system admin operations
 """
 from sqlalchemy.orm import Session
 from sqlalchemy import text, func, or_
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 from app.models import models_saas
 from app.schemas import schemas_admin
@@ -34,6 +34,20 @@ PLAN_LIMITS = {
         'max_classes': 200
     }
 }
+
+TENANT_CORE_TABLES = [
+    "departments",
+    "programmes",
+    "semesters",
+    "classes",
+    "teachers",
+    "subjects",
+    "rooms",
+    "days",
+    "shifts",
+    "periods",
+    "class_routine_entries",
+]
 
 
 def get_tenants_list(
@@ -300,4 +314,242 @@ def get_system_dashboard_stats(db: Session) -> dict:
         "tenants_by_plan": tenants_by_plan,
         "growth_this_month": growth_this_month,
         "revenue_this_month": float(revenue_this_month)
+    }
+
+
+def run_tenant_isolation_audit(db: Session) -> Dict[str, Any]:
+    """
+    Run a system-wide tenant isolation audit.
+
+    The audit is read-only and checks structural risks that can lead to
+    cross-tenant data exposure.
+    """
+    checks: List[Dict[str, Any]] = []
+
+    def add_check(name: str, status: str, message: str, details: Optional[dict] = None):
+        checks.append(
+            {
+                "name": name,
+                "status": status,  # pass | warn | fail
+                "message": message,
+                "details": details or {},
+            }
+        )
+
+    tenants = db.query(models_saas.Tenant).filter(
+        models_saas.Tenant.deleted_at.is_(None)
+    ).all()
+
+    add_check(
+        "tenant_count",
+        "pass" if tenants else "warn",
+        f"Found {len(tenants)} active tenant(s)",
+    )
+
+    # 1) Registry uniqueness checks
+    dup_subdomains = db.execute(
+        text(
+            """
+            SELECT lower(subdomain) AS subdomain, COUNT(*) AS cnt
+            FROM public.tenants
+            WHERE deleted_at IS NULL
+            GROUP BY lower(subdomain)
+            HAVING COUNT(*) > 1
+            ORDER BY cnt DESC, subdomain
+            """
+        )
+    ).fetchall()
+    if dup_subdomains:
+        add_check(
+            "duplicate_tenant_subdomains",
+            "fail",
+            "Duplicate active tenant subdomains found",
+            {"rows": [dict(r._mapping) for r in dup_subdomains]},
+        )
+    else:
+        add_check("duplicate_tenant_subdomains", "pass", "No duplicate active tenant subdomains")
+
+    dup_schema_names = db.execute(
+        text(
+            """
+            SELECT schema_name, COUNT(*) AS cnt
+            FROM public.tenants
+            WHERE deleted_at IS NULL
+            GROUP BY schema_name
+            HAVING COUNT(*) > 1
+            ORDER BY cnt DESC, schema_name
+            """
+        )
+    ).fetchall()
+    if dup_schema_names:
+        add_check(
+            "duplicate_tenant_schema_names",
+            "fail",
+            "Duplicate schema_name values found in active tenants",
+            {"rows": [dict(r._mapping) for r in dup_schema_names]},
+        )
+    else:
+        add_check("duplicate_tenant_schema_names", "pass", "No duplicate active tenant schema names")
+
+    # 2) User -> Tenant linkage checks
+    orphan_users = db.execute(
+        text(
+            """
+            SELECT COUNT(*) AS cnt
+            FROM public.users u
+            LEFT JOIN public.tenants t ON t.id = u.tenant_id
+            WHERE u.deleted_at IS NULL
+              AND t.id IS NULL
+            """
+        )
+    ).scalar() or 0
+    if orphan_users > 0:
+        add_check(
+            "orphan_users",
+            "fail",
+            f"Found {orphan_users} user(s) referencing missing tenants",
+            {"count": orphan_users},
+        )
+    else:
+        add_check("orphan_users", "pass", "No orphan users found")
+
+    duplicate_user_emails = db.execute(
+        text(
+            """
+            SELECT lower(email) AS email, COUNT(DISTINCT tenant_id) AS tenant_count,
+                   ARRAY_AGG(DISTINCT tenant_id ORDER BY tenant_id) AS tenant_ids
+            FROM public.users
+            WHERE deleted_at IS NULL
+            GROUP BY lower(email)
+            HAVING COUNT(DISTINCT tenant_id) > 1
+            ORDER BY tenant_count DESC, email
+            """
+        )
+    ).fetchall()
+    if duplicate_user_emails:
+        add_check(
+            "cross_tenant_duplicate_emails",
+            "warn",
+            "Some emails exist in multiple tenants; ensure login remains tenant-scoped",
+            {"rows": [dict(r._mapping) for r in duplicate_user_emails[:100]]},
+        )
+    else:
+        add_check("cross_tenant_duplicate_emails", "pass", "No duplicate user emails across tenants")
+
+    # 3) Per-tenant schema/table integrity
+    missing_schemas: List[str] = []
+    tenants_with_missing_tables: List[Dict[str, Any]] = []
+
+    for tenant in tenants:
+        schema_exists = db.execute(
+            text(
+                """
+                SELECT EXISTS (
+                    SELECT 1
+                    FROM information_schema.schemata
+                    WHERE schema_name = :schema_name
+                )
+                """
+            ),
+            {"schema_name": tenant.schema_name},
+        ).scalar()
+
+        if not schema_exists:
+            missing_schemas.append(tenant.schema_name)
+            continue
+
+        missing_tables: List[str] = []
+        for table_name in TENANT_CORE_TABLES:
+            table_exists = db.execute(
+                text(
+                    """
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM information_schema.tables
+                        WHERE table_schema = :schema_name
+                          AND table_name = :table_name
+                    )
+                    """
+                ),
+                {"schema_name": tenant.schema_name, "table_name": table_name},
+            ).scalar()
+            if not table_exists:
+                missing_tables.append(table_name)
+
+        if missing_tables:
+            tenants_with_missing_tables.append(
+                {
+                    "tenant_id": tenant.id,
+                    "subdomain": tenant.subdomain,
+                    "schema_name": tenant.schema_name,
+                    "missing_tables": missing_tables,
+                }
+            )
+
+    if missing_schemas:
+        add_check(
+            "missing_tenant_schemas",
+            "fail",
+            "Some active tenants reference missing schemas",
+            {"schema_names": missing_schemas},
+        )
+    else:
+        add_check("missing_tenant_schemas", "pass", "All active tenant schemas exist")
+
+    if tenants_with_missing_tables:
+        add_check(
+            "missing_core_tables",
+            "fail",
+            "Some tenant schemas are missing required core tables",
+            {"tenants": tenants_with_missing_tables},
+        )
+    else:
+        add_check("missing_core_tables", "pass", "All tenant schemas contain required core tables")
+
+    # 4) Public schema contamination check (tenant business tables should be empty)
+    contaminated_public_tables: List[Dict[str, Any]] = []
+    for table_name in TENANT_CORE_TABLES:
+        table_exists = db.execute(
+            text(
+                """
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = :table_name
+                )
+                """
+            ),
+            {"table_name": table_name},
+        ).scalar()
+
+        if not table_exists:
+            continue
+
+        # table_name is from a fixed allowlist in code, not user input.
+        row_count = db.execute(text(f'SELECT COUNT(*) FROM public."{table_name}"')).scalar() or 0
+        if row_count > 0:
+            contaminated_public_tables.append({"table": table_name, "rows": int(row_count)})
+
+    if contaminated_public_tables:
+        add_check(
+            "public_schema_contamination",
+            "warn",
+            "Public schema contains tenant-style business data tables with rows",
+            {"tables": contaminated_public_tables},
+        )
+    else:
+        add_check("public_schema_contamination", "pass", "No tenant business data found in public schema")
+
+    pass_count = sum(1 for c in checks if c["status"] == "pass")
+    warn_count = sum(1 for c in checks if c["status"] == "warn")
+    fail_count = sum(1 for c in checks if c["status"] == "fail")
+
+    return {
+        "generated_at": datetime.utcnow().isoformat() + "Z",
+        "summary": {
+            "passed": pass_count,
+            "warnings": warn_count,
+            "failed": fail_count,
+            "overall": "fail" if fail_count else ("warn" if warn_count else "pass"),
+        },
+        "checks": checks,
     }

@@ -313,6 +313,18 @@ def get_tenant_audit_logs(
     }
 
 
+@router.get("/security/tenant-isolation-audit")
+def run_tenant_isolation_audit(
+    db: Session = Depends(get_db),
+    current_user: models_saas.User = Depends(get_superadmin)
+):
+    """
+    Run a read-only tenant isolation audit across all active tenants.
+    Superadmin only.
+    """
+    return admin_service.run_tenant_isolation_audit(db)
+
+
 # ============ SYSTEM ANALYTICS ============
 
 @router.get("/analytics/dashboard")

@@ -1,5 +1,5 @@
 """Authentication endpoints for login and password management"""
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from datetime import datetime
 from pydantic import BaseModel, EmailStr
@@ -45,7 +45,11 @@ class ChangePasswordRequest(BaseModel):
 
 
 @router.post("/login", response_model=LoginResponse)
-def login(credentials: LoginRequest, db: Session = Depends(get_db)):
+def login(
+    credentials: LoginRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
     """
     Authenticate user and return JWT token
     
@@ -59,8 +63,18 @@ def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     Raises:
         HTTPException: If credentials are invalid or user is inactive
     """
-    # Find user by email in public.users table (cross-tenant search)
-    user = db.query(User).filter(User.email == credentials.email).first()
+    tenant = getattr(request.state, "tenant", None)
+    if tenant is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tenant context required for login. Use tenant subdomain.",
+        )
+
+    # Authenticate user only within the current tenant context.
+    user = db.query(User).filter(
+        User.email == credentials.email,
+        User.tenant_id == tenant.id,
+    ).first()
     
     if not user or not verify_password(credentials.password, user.password_hash):
         raise HTTPException(
@@ -79,20 +93,14 @@ def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     user.last_login = datetime.utcnow()
     db.commit()
     
-    # Fetch tenant subdomain
-    tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
-    if not tenant:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Tenant not found for user"
-        )
-    
     # Create access token with user information
     access_token = create_access_token(
         data={
             "sub": str(user.id),
             "email": user.email,
-            "role": user.role
+            "role": user.role,
+            "tenant_id": user.tenant_id,
+            "tenant_subdomain": tenant.subdomain,
         }
     )
     

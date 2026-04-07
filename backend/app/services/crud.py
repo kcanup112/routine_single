@@ -200,6 +200,14 @@ class SubjectService:
 class ClassService:
     @staticmethod
     def create(db: Session, class_: schemas.ClassCreate):
+        if class_.shift_id is None:
+            raise ValueError("shift_id is required when creating a class")
+        shift = db.query(models.Shift).filter(
+            models.Shift.id == class_.shift_id,
+            models.Shift.is_active == True,
+        ).first()
+        if not shift:
+            raise ValueError("Invalid or inactive shift_id")
         db_class = models.Class(**class_.dict())
         db.add(db_class)
         db.commit()
@@ -223,6 +231,15 @@ class ClassService:
         db_class = db.query(models.Class).filter(models.Class.id == class_id).first()
         if db_class:
             update_data = class_.dict(exclude_unset=True)
+            if "shift_id" in update_data:
+                if update_data["shift_id"] is None:
+                    raise ValueError("shift_id cannot be null")
+                shift = db.query(models.Shift).filter(
+                    models.Shift.id == update_data["shift_id"],
+                    models.Shift.is_active == True,
+                ).first()
+                if not shift:
+                    raise ValueError("Invalid or inactive shift_id")
             for key, value in update_data.items():
                 setattr(db_class, key, value)
             db.commit()

@@ -15,6 +15,18 @@ import {
 } from '@mui/material';
 import { Visibility, VisibilityOff, Login as LoginIcon } from '@mui/icons-material';
 
+const getTenantSubdomain = () => {
+  const host = window.location.hostname || '';
+  const parts = host.split('.');
+  if (parts.length >= 2) {
+    const candidate = parts[0];
+    if (!['www', 'api', 'localhost'].includes(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+};
+
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -31,9 +43,12 @@ export default function LoginPage() {
 
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const tenantSubdomain = getTenantSubdomain();
       const response = await axios.post(`${API_URL}/auth/login`, {
         email,
         password
+      }, {
+        headers: tenantSubdomain ? { 'X-Tenant-Subdomain': tenantSubdomain } : {},
       });
 
       const { access_token, user } = response.data;

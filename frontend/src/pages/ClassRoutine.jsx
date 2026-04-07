@@ -298,10 +298,9 @@ export default function ClassRoutine() {
     try {
       const classObj = classes.find(c => c.id === parseInt(formData.class_id))
       if (!classObj) {
-        console.warn('Class not found, loading default shift teaching periods as fallback')
-        const response = await periodService.getDefaultTeaching()
-        setPeriods(response.data)
-        return response.data || []
+        console.warn('Class not found yet, waiting for class list before loading periods')
+        setPeriods([])
+        return []
       }
       
       if (!classObj.shift_id) {

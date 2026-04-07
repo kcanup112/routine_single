@@ -3,6 +3,23 @@ import { authService } from '../services/authService';
 
 const AuthContext = createContext(null);
 
+const getCurrentSubdomain = () => {
+  const host = window.location.hostname || '';
+  const parts = host.split('.');
+  if (parts.length >= 2) {
+    const candidate = parts[0];
+    if (!['www', 'api', 'localhost', '127'].includes(candidate)) {
+      return candidate;
+    }
+  }
+  return null;
+};
+
+const clearAuthStorage = () => {
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -14,11 +31,23 @@ export const AuthProvider = ({ children }) => {
     
     if (token && userData) {
       try {
-        setUser(JSON.parse(userData));
+        const parsed = JSON.parse(userData);
+        const currentSubdomain = getCurrentSubdomain();
+
+        // Prevent cross-tenant session reuse when switching subdomains.
+        if (
+          currentSubdomain &&
+          parsed?.tenant_subdomain &&
+          parsed.tenant_subdomain !== currentSubdomain
+        ) {
+          clearAuthStorage();
+          setUser(null);
+        } else {
+          setUser(parsed);
+        }
       } catch (error) {
         console.error('Failed to parse user data:', error);
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        clearAuthStorage();
       }
     }
     setLoading(false);
@@ -28,6 +57,15 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await authService.login(email, password);
       const { access_token, user: userData } = response.data;
+
+      const currentSubdomain = getCurrentSubdomain();
+      if (
+        currentSubdomain &&
+        userData?.tenant_subdomain &&
+        userData.tenant_subdomain !== currentSubdomain
+      ) {
+        throw new Error('Tenant mismatch. Please login from your tenant subdomain.');
+      }
       
       localStorage.setItem('token', access_token);
       localStorage.setItem('user', JSON.stringify(userData));

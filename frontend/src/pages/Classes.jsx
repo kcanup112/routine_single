@@ -119,7 +119,7 @@ export default function Classes() {
       name: '',
       section: '',
       semester_id: '',
-      shift_id: '',
+      shift_id: shifts[0]?.id || '',
       department_id: '',
       room_no: '',
       effective_date: null,
@@ -135,7 +135,7 @@ export default function Classes() {
       name: '',
       section: '',
       semester_id: '',
-      shift_id: '',
+      shift_id: shifts[0]?.id || '',
       department_id: '',
       room_no: '',
       effective_date: null,
@@ -158,6 +158,11 @@ export default function Classes() {
   }
 
   const handleSubmit = async () => {
+    if (!formData.shift_id) {
+      alert('Please select a shift for this class.')
+      return
+    }
+
     setLoading(true)
     try {
       const submitData = {
@@ -302,14 +307,12 @@ export default function Classes() {
             margin="dense"
             label="Shift"
             fullWidth
+            required
             value={formData.shift_id}
             onChange={(e) => setFormData({ ...formData, shift_id: e.target.value })}
             sx={{ mb: 2 }}
-            helperText="Select the shift for this class. Periods will be filtered based on this shift."
+            helperText="Shift is required. Routine periods are filtered by this shift."
           >
-            <MenuItem value="">
-              <em>No Shift (Show all periods)</em>
-            </MenuItem>
             {shifts.map((shift) => (
               <MenuItem key={shift.id} value={shift.id}>
                 {shift.name} ({shift.start_time} - {shift.end_time})

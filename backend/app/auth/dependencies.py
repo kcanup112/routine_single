@@ -1,5 +1,5 @@
 """Authentication and authorization dependencies for FastAPI routes"""
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from app.core.database_saas import get_db
@@ -10,6 +10,7 @@ security = HTTPBearer()
 
 
 def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)
 ) -> models_saas.User:
@@ -50,6 +51,21 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found or inactive",
             headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token_tenant_id = payload.get("tenant_id")
+    if token_tenant_id is not None and int(token_tenant_id) != user.tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token tenant",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    request_tenant_id = getattr(request.state, "tenant_id", None)
+    if request_tenant_id is not None and user.tenant_id != request_tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tenant mismatch for authenticated user",
         )
     
     return user

@@ -9,7 +9,10 @@ router = APIRouter(prefix="/classes", tags=["classes"])
 
 @router.post("/", response_model=schemas.Class)
 def create_class(class_data: schemas.ClassCreate, db: Session = Depends(get_db)):
-    return ClassService.create(db, class_data)
+    try:
+        return ClassService.create(db, class_data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/", response_model=List[schemas.Class])
 def get_classes(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
@@ -28,7 +31,10 @@ def get_classes_by_semester(semester_id: int, db: Session = Depends(get_db)):
 
 @router.put("/{class_id}/", response_model=schemas.Class)
 def update_class(class_id: int, class_data: schemas.ClassUpdate, db: Session = Depends(get_db)):
-    updated = ClassService.update(db, class_id, class_data)
+    try:
+        updated = ClassService.update(db, class_id, class_data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if not updated:
         raise HTTPException(status_code=404, detail="Class not found")
     return updated

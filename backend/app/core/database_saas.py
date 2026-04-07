@@ -41,7 +41,11 @@ def get_db():
         if schema:
             # Set search_path for this session
             db.execute(text(f'SET search_path TO "{schema}", public'))
-            db.commit()
+        else:
+            # Always reset to public to avoid inheriting stale search_path from
+            # pooled connections.
+            db.execute(text('SET search_path TO public'))
+        db.commit()
         yield db
     finally:
         db.close()
