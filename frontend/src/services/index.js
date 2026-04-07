@@ -87,6 +87,7 @@ export const dayService = {
 
 export const periodService = {
   getAll: () => api.get('/periods/'),
+  getDefaultTeaching: () => api.get('/periods/default/teaching'),
   getById: (id) => api.get(`/periods/${id}/`),
   create: (data) => api.post('/periods/', data),
   update: (id, data) => api.put(`/periods/${id}/`, data),

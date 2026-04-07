@@ -634,19 +634,46 @@ class PeriodService:
     @staticmethod
     def get_by_shift(db: Session, shift_id: int):
         """Get all periods for a specific shift"""
+        shift_obj = db.query(models.Shift).filter(
+            models.Shift.id == shift_id,
+            models.Shift.is_active == True,
+        ).first()
+        if not shift_obj:
+            return []
         return db.query(models.Period).filter(
             models.Period.shift_id == shift_id,
-            models.Period.is_active == True
+            models.Period.is_active == True,
+            models.Period.start_time >= shift_obj.start_time,
+            models.Period.end_time <= shift_obj.end_time,
         ).order_by(models.Period.period_number).all()
     
     @staticmethod
     def get_teaching_periods_by_shift(db: Session, shift_id: int):
         """Get only teaching periods for a specific shift"""
+        shift_obj = db.query(models.Shift).filter(
+            models.Shift.id == shift_id,
+            models.Shift.is_active == True,
+        ).first()
+        if not shift_obj:
+            return []
         return db.query(models.Period).filter(
             models.Period.shift_id == shift_id,
             models.Period.is_teaching_period == True,
-            models.Period.is_active == True
+            models.Period.is_active == True,
+            models.Period.start_time >= shift_obj.start_time,
+            models.Period.end_time <= shift_obj.end_time,
         ).order_by(models.Period.period_number).all()
+
+    @staticmethod
+    def get_default_teaching_periods(db: Session):
+        """Get teaching periods for the default active shift."""
+        default_shift = db.query(models.Shift).filter(
+            models.Shift.is_default == True,
+            models.Shift.is_active == True,
+        ).first()
+        if not default_shift:
+            return []
+        return PeriodService.get_teaching_periods_by_shift(db, default_shift.id)
     
     @staticmethod
     def update(db: Session, period_id: int, period: schemas.PeriodCreate):
@@ -1055,18 +1082,21 @@ class RoutineGeneratorService:
             return {'placed': 0, 'unplaced': [], 'class_results': [],
                     'error': 'No working days configured'}
 
-        # 2. All active teaching periods
-        all_periods_db = (db.query(models.Period)
-                            .filter(models.Period.is_teaching_period == True,
-                                    models.Period.is_active == True)
-                            .order_by(models.Period.period_number)
-                            .all())
-        period_number_map = {p.id: p.period_number for p in all_periods_db}
+        # 2. Build a complete period map so immutable existing entries are
+        #    respected even if a period is non-teaching or inactive.
+        period_number_map = {
+            p.id: p.period_number
+            for p in db.query(models.Period).all()
+        }
 
-        # 3. Pre-build busy maps from ALL existing entries (theory + lab)
+        # 3. Pre-build busy maps from ALL existing entries (theory + lab).
+        #    Existing entries are treated as IMMUTABLE – no deletions.
         all_existing = db.query(models.ClassRoutineEntry).all()
         teacher_busy = defaultdict(set)
         class_busy   = defaultdict(set)
+        existing_counts = defaultdict(int)  # (class_id, subject_id, teacher_id) → placed periods
+
+        target_class_ids = {ca['class_id'] for ca in assignments}
 
         for entry in all_existing:
             pn = period_number_map.get(entry.period_id)
@@ -1082,42 +1112,39 @@ class RoutineGeneratorService:
                     if tid:
                         teacher_busy[tid].add(slot)
 
-        # 4. Collect IDs of classes to regenerate
-        class_ids = [ca['class_id'] for ca in assignments]
+            # Count already-placed theory periods for target classes
+            if entry.class_id in target_class_ids and not entry.is_lab:
+                existing_counts[
+                    (entry.class_id, entry.subject_id, entry.lead_teacher_id)
+                ] += (entry.num_periods or 1)
 
-        # 5. Delete only existing THEORY entries for these classes
-        #    Reset class_busy to only lab slots; remove deleted theory from teacher_busy
-        lab_slots_by_class = defaultdict(set)
-        for entry in all_existing:
-            if entry.class_id in class_ids and entry.is_lab:
-                pn = period_number_map.get(entry.period_id)
-                if pn is None:
-                    continue
-                for offset in range(entry.num_periods or 1):
-                    lab_slots_by_class[entry.class_id].add((entry.day_id, pn + offset))
+        # 4. Resolve default shift (fallback for classes that have no shift_id)
+        default_shift = (
+            db.query(models.Shift)
+              .filter(models.Shift.is_default == True,
+                      models.Shift.is_active == True)
+              .first()
+        )
 
-        for cid in class_ids:
-            db.query(models.ClassRoutineEntry).filter(
-                models.ClassRoutineEntry.class_id == cid,
-                models.ClassRoutineEntry.is_lab == False,
-            ).delete()
-            class_busy[cid] = lab_slots_by_class[cid].copy()
+        def _teaching_periods_for_shift(shift_id: int):
+            """Return active teaching periods that strictly fit inside shift bounds."""
+            shift_obj = (
+                db.query(models.Shift)
+                .filter(models.Shift.id == shift_id, models.Shift.is_active == True)
+                .first()
+            )
+            if not shift_obj:
+                return []
+            return (db.query(models.Period)
+                      .filter(models.Period.shift_id == shift_id,
+                              models.Period.is_teaching_period == True,
+                              models.Period.is_active == True,
+                              models.Period.start_time >= shift_obj.start_time,
+                              models.Period.end_time <= shift_obj.end_time)
+                      .order_by(models.Period.period_number)
+                      .all())
 
-        for entry in all_existing:
-            if entry.class_id in class_ids and not entry.is_lab:
-                pn = period_number_map.get(entry.period_id)
-                if pn is None:
-                    continue
-                for offset in range(entry.num_periods or 1):
-                    slot = (entry.day_id, pn + offset)
-                    for tid in [entry.lead_teacher_id,
-                                entry.assist_teacher_1_id,
-                                entry.assist_teacher_2_id,
-                                entry.assist_teacher_3_id]:
-                        if tid:
-                            teacher_busy[tid].discard(slot)
-
-        # 6. Process each class
+        # 5. Process each class (only fill *remaining* load; no deletions)
         total_placed  = 0
         unplaced      = []
         class_results = []
@@ -1130,14 +1157,11 @@ class RoutineGeneratorService:
                 continue
 
             if cls.shift_id:
-                shift_periods = (db.query(models.Period)
-                                   .filter(models.Period.shift_id == cls.shift_id,
-                                           models.Period.is_teaching_period == True,
-                                           models.Period.is_active == True)
-                                   .order_by(models.Period.period_number)
-                                   .all())
+                shift_periods = _teaching_periods_for_shift(cls.shift_id)
+            elif default_shift:
+                shift_periods = _teaching_periods_for_shift(default_shift.id)
             else:
-                shift_periods = all_periods_db
+                shift_periods = []
 
             pnums = [p.period_number for p in shift_periods]
             pid_by_pnum = {p.period_number: p.id for p in shift_periods}
@@ -1167,7 +1191,12 @@ class RoutineGeneratorService:
                     if load == 0:
                         continue
 
-                    blocks = _block_fn(load)
+                    already = existing_counts.get((class_id, subject_id, teacher_id), 0)
+                    remaining = load - already
+                    if remaining <= 0:
+                        continue
+
+                    blocks = _block_fn(remaining)
                     subject_placed = 0
 
                     for block_size in blocks:
@@ -1259,13 +1288,14 @@ class RoutineGeneratorService:
                             })
 
                     class_placed += subject_placed
-                    if subject_placed < load:
+                    if subject_placed < remaining:
                         class_unplaced.append({
                             'subject_id': subject_id,
                             'teacher_id': teacher_id,
                             'load': load,
                             'placed': subject_placed,
-                            'reason': f'Only placed {subject_placed}/{load} periods',
+                            'already': already,
+                            'reason': f'Only placed {subject_placed}/{remaining} remaining periods',
                         })
 
             total_placed += class_placed

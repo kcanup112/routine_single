@@ -25,6 +25,11 @@ def get_teaching_periods_by_shift(shift_id: int, db: Session = Depends(get_db)):
     """Get only teaching periods for a specific shift"""
     return PeriodService.get_teaching_periods_by_shift(db, shift_id)
 
+@router.get("/default/teaching", response_model=List[schemas.Period])
+def get_default_teaching_periods(db: Session = Depends(get_db)):
+    """Get teaching periods for the default active shift."""
+    return PeriodService.get_default_teaching_periods(db)
+
 @router.get("/{period_id}", response_model=schemas.Period)
 def get_period(period_id: int, db: Session = Depends(get_db)):
     period = PeriodService.get_by_id(db, period_id)

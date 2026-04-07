@@ -93,8 +93,11 @@ class CPSATRoutineSolver:
             .order_by(models.Period.period_number)
             .all()
         )
+        # Include every period in the map so existing immutable entries are
+        # respected even if a period is non-teaching or inactive.
         period_number_map: Dict[int, int] = {
-            p.id: p.period_number for p in all_periods_db
+            p.id: p.period_number
+            for p in db.query(models.Period).all()
         }
 
         # ── 2. read ALL existing entries → immutable busy maps ──────────
@@ -141,23 +144,46 @@ class CPSATRoutineSolver:
         # cache: class → shift periods info
         _shift_cache: dict = {}
 
+        # Resolve default shift once for classes that have no shift_id assigned
+        _default_shift = (
+            db.query(models.Shift)
+            .filter(models.Shift.is_default == True, models.Shift.is_active == True)
+            .first()
+        )
+
+        def _teaching_periods_for_shift(shift_id: int):
+            """Return active teaching periods that strictly fit inside shift bounds."""
+            shift_obj = (
+                db.query(models.Shift)
+                .filter(models.Shift.id == shift_id, models.Shift.is_active == True)
+                .first()
+            )
+            if not shift_obj:
+                return []
+            return (
+                db.query(models.Period)
+                .filter(
+                    models.Period.shift_id == shift_id,
+                    models.Period.is_teaching_period == True,
+                    models.Period.is_active == True,
+                    models.Period.start_time >= shift_obj.start_time,
+                    models.Period.end_time <= shift_obj.end_time,
+                )
+                .order_by(models.Period.period_number)
+                .all()
+            )
+
         def _class_periods(cls_obj):
             """Return (pnums_list, pid_by_pnum_dict, adj_pairs_list) for a class."""
             key = cls_obj.shift_id or 0
             if key not in _shift_cache:
                 if cls_obj.shift_id:
-                    sp = (
-                        db.query(models.Period)
-                        .filter(
-                            models.Period.shift_id == cls_obj.shift_id,
-                            models.Period.is_teaching_period == True,
-                            models.Period.is_active == True,
-                        )
-                        .order_by(models.Period.period_number)
-                        .all()
-                    )
+                    sp = _teaching_periods_for_shift(cls_obj.shift_id)
+                elif _default_shift:
+                    sp = _teaching_periods_for_shift(_default_shift.id)
                 else:
-                    sp = all_periods_db
+                    # No assigned shift and no default shift -> no valid domain.
+                    sp = []
                 pnums = [p.period_number for p in sp]
                 pid_by_pnum = {p.period_number: p.id for p in sp}
                 adj = [

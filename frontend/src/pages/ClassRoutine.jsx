@@ -267,53 +267,67 @@ export default function ClassRoutine() {
   }, [formData.semester_id])
 
   useEffect(() => {
-    // Load routine when class is selected
-    if (formData.class_id) {
-      loadRoutineForClass()
-      loadPeriodsForClass()
-    } else {
-      // Clear routine and periods if class is deselected
-      setRoutineData({})
-      setPeriods([])
+    // Load periods first, then routine to ensure continuation mapping uses
+    // the correct period sequence for the selected class.
+    let cancelled = false
+
+    const loadClassContext = async () => {
+      if (!formData.class_id) {
+        setRoutineData({})
+        setPeriods([])
+        return
+      }
+
+      const loadedPeriods = await loadPeriodsForClass()
+      if (!cancelled) {
+        await loadRoutineForClass(loadedPeriods)
+      }
     }
-  }, [formData.class_id])
+
+    loadClassContext()
+    return () => { cancelled = true }
+  }, [formData.class_id, classes])
 
   // Load periods based on selected class's shift
   const loadPeriodsForClass = async () => {
     if (!formData.class_id) {
       setPeriods([])
-      return
+      return []
     }
     
     try {
       const classObj = classes.find(c => c.id === parseInt(formData.class_id))
       if (!classObj) {
-        console.warn('Class not found, loading all periods as fallback')
-        const response = await periodService.getAll()
+        console.warn('Class not found, loading default shift teaching periods as fallback')
+        const response = await periodService.getDefaultTeaching()
         setPeriods(response.data)
-        return
+        return response.data || []
       }
       
       if (!classObj.shift_id) {
-        // If class has no shift assigned, load all periods (fallback)
-        console.warn('Class has no shift assigned, loading all periods')
-        const response = await periodService.getAll()
+        // If class has no shift assigned, use default shift teaching periods.
+        console.warn('Class has no shift assigned, loading default shift teaching periods')
+        const response = await periodService.getDefaultTeaching()
         setPeriods(response.data)
-        return
+        return response.data || []
       }
       
       // Load periods for the class's shift
       console.log(`Loading periods for shift ${classObj.shift_id}`)
       const response = await api.get(`/periods/shift/${classObj.shift_id}`)
       setPeriods(response.data)
+      return response.data || []
     } catch (error) {
       console.error('Error loading periods for class:', error)
-      // Fallback to all periods
+      // Conservative fallback: keep grid empty instead of mixing periods across shifts.
       try {
-        const response = await periodService.getAll()
+        const response = await periodService.getDefaultTeaching()
         setPeriods(response.data)
+        return response.data || []
       } catch (fallbackError) {
         console.error('Error loading fallback periods:', fallbackError)
+        setPeriods([])
+        return []
       }
     }
   }
@@ -528,7 +542,7 @@ export default function ClassRoutine() {
     }
   }
 
-  const loadRoutineForClass = async () => {
+  const loadRoutineForClass = async (periodList = periods) => {
     if (!formData.class_id) {
       setRoutineData({})
       return
@@ -554,6 +568,7 @@ export default function ClassRoutine() {
       // Transform entries array to routineData object
       const newRoutineData = {}
       const labGroups = {} // Track multi-subject labs by lab_group_id
+      const activePeriods = periodList?.length ? periodList : periods
       
       // First pass: group multi-subject labs
       console.log('=== LOADING MULTI-SUBJECT LABS ===')
@@ -636,12 +651,12 @@ export default function ClassRoutine() {
         }
         
         // Create continuation cells for multi-period assignments
-        if (entry.num_periods > 1 && periods.length > 0) {
-          const startPeriodIndex = periods.findIndex(p => p.id === entry.periodId)
+        if (entry.num_periods > 1 && activePeriods.length > 0) {
+          const startPeriodIndex = activePeriods.findIndex(p => p.id === entry.periodId)
           if (startPeriodIndex !== -1) {
             for (let i = 1; i < entry.num_periods; i++) {
-              if (startPeriodIndex + i < periods.length) {
-                const nextPeriod = periods[startPeriodIndex + i]
+              if (startPeriodIndex + i < activePeriods.length) {
+                const nextPeriod = activePeriods[startPeriodIndex + i]
                 const contKey = `${entry.dayId}-${nextPeriod.id}`
                 newRoutineData[contKey] = {
                   isContinuation: true,
