@@ -64,23 +64,32 @@ def login(
         HTTPException: If credentials are invalid or user is inactive
     """
     tenant = getattr(request.state, "tenant", None)
-    if tenant is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Tenant context required for login. Use tenant subdomain.",
-        )
 
-    # Authenticate user only within the current tenant context.
-    user = db.query(User).filter(
-        User.email == credentials.email,
-        User.tenant_id == tenant.id,
-    ).first()
-    
+    if tenant is not None:
+        # Tenant context available (subdomain login) – scope query to tenant.
+        user = db.query(User).filter(
+            User.email == credentials.email,
+            User.tenant_id == tenant.id,
+        ).first()
+    else:
+        # No tenant context (plain localhost login) – look up by email globally.
+        user = db.query(User).filter(
+            User.email == credentials.email,
+        ).first()
+        if user:
+            tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
+
     if not user or not verify_password(credentials.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    if tenant is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unable to determine tenant for this user.",
         )
     
     if not user.is_active:
