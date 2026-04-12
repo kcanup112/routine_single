@@ -32,9 +32,11 @@ import {
   VpnKey as ResetPasswordIcon,
 } from '@mui/icons-material';
 import { userService } from '../services/authService';
+import { useAuth } from '../contexts/AuthContext';
 import api from '../services/api';
 
 export default function UserManagement() {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
@@ -92,7 +94,7 @@ export default function UserManagement() {
         email: '',
         full_name: '',
         password: '',
-        role: 'teacher',
+        role: 'viewer',
         teacher_id: null,
         is_active: true,
       });
@@ -112,7 +114,6 @@ export default function UserManagement() {
         await userService.update(editingUser.id, {
           full_name: formData.full_name,
           role: formData.role,
-          teacher_id: formData.teacher_id || null,
           is_active: formData.is_active,
         });
         setSuccess('User updated successfully');
@@ -121,7 +122,12 @@ export default function UserManagement() {
           setError('Password is required for new users');
           return;
         }
-        await userService.create(formData);
+        await userService.create({
+          email: formData.email,
+          full_name: formData.full_name,
+          password: formData.password,
+          role: formData.role,
+        });
         setSuccess('User created successfully');
       }
       handleCloseDialog();
@@ -163,9 +169,9 @@ export default function UserManagement() {
 
   const getRoleColor = (role) => {
     switch (role) {
-      case 'superadmin': return 'error';
+      case 'super_admin': return 'error';
       case 'admin': return 'warning';
-      case 'teacher': return 'info';
+      case 'viewer': return 'success';
       default: return 'default';
     }
   };
@@ -305,9 +311,11 @@ export default function UserManagement() {
                 onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                 label="Role"
               >
-                <MenuItem value="teacher">Teacher</MenuItem>
-                <MenuItem value="admin">Admin</MenuItem>
-                <MenuItem value="superadmin">Super Admin</MenuItem>
+                <MenuItem value="viewer">Viewer (Read Only)</MenuItem>
+                <MenuItem value="admin">Admin (Full Access)</MenuItem>
+                {currentUser?.role === 'super_admin' && (
+                  <MenuItem value="super_admin">Super Admin</MenuItem>
+                )}
               </Select>
             </FormControl>
             <FormControl fullWidth>

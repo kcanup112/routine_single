@@ -16,6 +16,7 @@ import {
   IconButton,
   Grid,
   InputAdornment,
+  Alert,
 } from '@mui/material'
 import { DataGrid } from '@mui/x-data-grid'
 import { 
@@ -49,6 +50,7 @@ export default function Teachers() {
     max_periods_per_week: 30,
     department_id: '',
     is_active: true,
+    account_role: 'viewer',
   })
   const [loading, setLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -110,7 +112,8 @@ export default function Teachers() {
       employment_type: 'full_time',
       max_periods_per_week: 30,
       department_id: '',
-      is_active: true
+      is_active: true,
+      account_role: 'viewer',
     })
   }
 
@@ -133,12 +136,16 @@ export default function Teachers() {
     setOpen(true)
   }
 
+  // State for temp password alert
+  const [tempPasswordInfo, setTempPasswordInfo] = useState(null)
+
   const handleSubmit = async () => {
     setLoading(true)
     try {
       // Prepare data - convert empty strings to null for optional fields
+      const { account_role, ...rest } = formData
       const submitData = {
-        ...formData,
+        ...rest,
         email: formData.email?.trim() || null,
         phone: formData.phone?.trim() || null,
         department_id: formData.department_id === '' ? null : formData.department_id,
@@ -147,7 +154,15 @@ export default function Teachers() {
       if (editMode) {
         await teacherService.update(editId, submitData)
       } else {
-        await teacherService.create(submitData)
+        const response = await teacherService.create(submitData, account_role)
+        const data = response.data
+        // Show default password info if account was auto-created
+        if (data.temp_password) {
+          setTempPasswordInfo({
+            name: data.name,
+            email: data.email,
+          })
+        }
       }
       await loadTeachers()
       handleClose()
@@ -339,6 +354,18 @@ export default function Teachers() {
     },
     { field: 'email', headerName: 'Email', width: 200 },
     { field: 'phone', headerName: 'Phone', width: 130 },
+    {
+      field: 'has_account',
+      headerName: 'Account',
+      width: 100,
+      renderCell: (params) => params.row.has_account ? (
+        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, color: '#10b981', fontSize: '0.75rem', fontWeight: 600 }}>
+          ✓ Active
+        </Box>
+      ) : (
+        <Box sx={{ color: '#94a3b8', fontSize: '0.75rem' }}>No account</Box>
+      ),
+    },
     { 
       field: 'department_id', 
       headerName: 'Department', 
@@ -371,6 +398,20 @@ export default function Teachers() {
 
   return (
     <Box>
+      {/* Temp password alert after teacher creation */}
+      {tempPasswordInfo && (
+        <Alert 
+          severity="info" 
+          sx={{ mb: 2 }}
+          onClose={() => setTempPasswordInfo(null)}
+        >
+          <strong>Viewer account created for {tempPasswordInfo.name}</strong><br />
+          Email: <strong>{tempPasswordInfo.email}</strong><br />
+          Default Password: <strong>kec123</strong><br />
+          <em>Teachers can change their password from the dashboard after logging in.</em>
+        </Alert>
+      )}
+
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3, flexWrap: 'wrap', gap: 2 }}>
         <Box>
           <Typography variant="h5" sx={{ fontWeight: 700, color: '#1a2332', mb: 0.25 }}>Teachers</Typography>
@@ -513,6 +554,20 @@ export default function Teachers() {
               </MenuItem>
             ))}
           </TextField>
+          {!editMode && (
+            <TextField
+              select
+              margin="dense"
+              label="Account Role"
+              fullWidth
+              value={formData.account_role}
+              onChange={(e) => setFormData({ ...formData, account_role: e.target.value })}
+              helperText="Role for the auto-created login account (requires email)"
+            >
+              <MenuItem value="viewer">Viewer (Read-only)</MenuItem>
+              <MenuItem value="admin">Admin (Full access)</MenuItem>
+            </TextField>
+          )}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={handleClose} sx={{ borderRadius: '8px', textTransform: 'none' }}>Cancel</Button>

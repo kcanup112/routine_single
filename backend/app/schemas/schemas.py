@@ -174,11 +174,20 @@ class TeacherUpdate(BaseModel):
 
 class Teacher(TeacherBase):
     id: int
+    user_id: Optional[int] = None
+    has_account: bool = False
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     
     class Config:
         from_attributes = True
+    
+    @classmethod
+    def model_validate(cls, obj, **kwargs):
+        # Auto-compute has_account from user_id
+        instance = super().model_validate(obj, **kwargs)
+        instance.has_account = obj.user_id is not None if hasattr(obj, 'user_id') else False
+        return instance
 
 # ClassSubjectTeacher Schemas
 class ClassSubjectTeacherBase(BaseModel):

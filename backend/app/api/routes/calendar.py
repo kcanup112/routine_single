@@ -6,17 +6,18 @@ from app.core.database_saas import get_db
 from app.models.models import CalendarEvent
 from app.models.models_saas import User
 from app.schemas.calendar_schemas import CalendarEvent as CalendarEventSchema, CalendarEventCreate, CalendarEventUpdate
-from app.auth.dependencies import get_current_user, get_admin_or_above
+from app.auth.dependencies import require_read_access, require_write_access
 
 router = APIRouter()
 
-# Public endpoint - anyone can view events
+# Any authenticated user can view events
 @router.get("/", response_model=List[CalendarEventSchema])
 def get_calendar_events(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     event_type: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_read_access)
 ):
     """Get all calendar events, optionally filtered by date range and type"""
     query = db.query(CalendarEvent)
@@ -33,7 +34,8 @@ def get_calendar_events(
 @router.get("/{event_id}", response_model=CalendarEventSchema)
 def get_calendar_event(
     event_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_read_access)
 ):
     """Get a specific calendar event by ID"""
     event = db.query(CalendarEvent).filter(CalendarEvent.id == event_id).first()
@@ -46,7 +48,7 @@ def get_calendar_event(
 def create_calendar_event(
     event: CalendarEventCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_admin_or_above)
+    current_user: User = Depends(require_write_access)
 ):
     """Create a new calendar event (admin only)"""
     db_event = CalendarEvent(**event.dict())
@@ -61,7 +63,7 @@ def update_calendar_event(
     event_id: int,
     event_update: CalendarEventUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_admin_or_above)
+    current_user: User = Depends(require_write_access)
 ):
     """Update a calendar event (admin only)"""
     db_event = db.query(CalendarEvent).filter(CalendarEvent.id == event_id).first()
@@ -81,7 +83,7 @@ def update_calendar_event(
 def delete_calendar_event(
     event_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_admin_or_above)
+    current_user: User = Depends(require_write_access)
 ):
     """Delete a calendar event (admin only)"""
     db_event = db.query(CalendarEvent).filter(CalendarEvent.id == event_id).first()

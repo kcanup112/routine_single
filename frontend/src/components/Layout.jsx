@@ -47,6 +47,7 @@ import {
   AttachMoney as FinanceIcon,
   AccountCircle,
   Logout,
+  Lock as LockIcon,
   ManageAccounts,
   Login as LoginIcon,
   Event as CalendarIcon,
@@ -105,7 +106,7 @@ export default function Layout() {
   const [sidebarVisible, setSidebarVisible] = useState(true)
   const [anchorEl, setAnchorEl] = useState(null)
   const navigate = useNavigate()
-  const { user, logout, isAdmin, isAuthenticated, isSchool } = useAuth()
+  const { user, logout, isAdmin, isAuthenticated, isSchool, isViewer } = useAuth()
   const menuSections = useMemo(() => buildMenuSections(isSchool()), [user])
 
   const handleMenu = (event) => {
@@ -375,7 +376,7 @@ export default function Layout() {
                   </ListItemButton>
                 </ListItem>
                 
-                <ListItem disablePadding>
+                <ListItem disablePadding sx={{ mb: 0.5 }}>
                   <ListItemButton 
                     onClick={() => handleNavigation('/dashboard/finance')}
                     sx={{ 
@@ -392,6 +393,29 @@ export default function Layout() {
                     <ListItemText 
                       primary="Finance" 
                       primaryTypographyProps={{ fontWeight: 500, color: '#10b981', fontSize: '0.9375rem' }}
+                    />
+                  </ListItemButton>
+                </ListItem>
+                
+                <Divider sx={{ my: 2, borderColor: '#e2e8f0' }} />
+                
+                <ListItem disablePadding sx={{ mb: 0.5 }}>
+                  <ListItemButton 
+                    onClick={() => handleNavigation('/dashboard/users')}
+                    sx={{ 
+                      borderRadius: 2,
+                      py: 1.5,
+                      '&:hover': {
+                        bgcolor: 'rgba(245, 158, 11, 0.08)',
+                      },
+                    }}
+                  >
+                    <ListItemIcon sx={{ color: '#d97706', minWidth: 40 }}>
+                      <ManageAccounts />
+                    </ListItemIcon>
+                    <ListItemText 
+                      primary="User Management" 
+                      primaryTypographyProps={{ fontWeight: 600, color: '#d97706', fontSize: '0.9375rem' }}
                     />
                   </ListItemButton>
                 </ListItem>
@@ -487,7 +511,7 @@ export default function Layout() {
           {/* KEC Logo */}
           <Box 
             component="img" 
-            src="/kec logo.png" 
+            src="/logo.png" 
             alt="KEC Logo"
             sx={{
               height: 40,
@@ -517,8 +541,8 @@ export default function Layout() {
                   size="small"
                   sx={{ 
                     fontWeight: 600,
-                    bgcolor: user?.role === 'super_admin' ? 'rgba(239, 68, 68, 0.1)' : user?.role === 'admin' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(59, 130, 246, 0.1)',
-                    color: user?.role === 'super_admin' ? '#dc2626' : user?.role === 'admin' ? '#d97706' : '#2563eb',
+                    bgcolor: user?.role === 'super_admin' ? 'rgba(239, 68, 68, 0.1)' : user?.role === 'admin' ? 'rgba(245, 158, 11, 0.1)' : user?.role === 'viewer' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                    color: user?.role === 'super_admin' ? '#dc2626' : user?.role === 'admin' ? '#d97706' : user?.role === 'viewer' ? '#10b981' : '#2563eb',
                   }}
                 />
                 <IconButton
@@ -548,7 +572,13 @@ export default function Layout() {
                     </Typography>
                   </Box>
                   <Divider />
-                  {user?.role === 'superadmin' && (
+                  <MenuItem onClick={() => { handleClose(); navigate('/dashboard/change-password'); }}>
+                    <ListItemIcon>
+                      <LockIcon fontSize="small" />
+                    </ListItemIcon>
+                    Change Password
+                  </MenuItem>
+                  {(user?.role === 'super_admin' || user?.role === 'admin') && (
                   <MenuItem onClick={() => { handleClose(); navigate('/dashboard/users'); }}>
                     <ListItemIcon>
                       <ManageAccounts fontSize="small" />

@@ -4,11 +4,13 @@ from typing import List
 from app.core.database_saas import get_db
 from app.models.models import SemesterSubject, Subject
 from app.schemas.schemas import SemesterSubjectCreate, SemesterSubject as SemesterSubjectSchema
+from app.auth.dependencies import require_read_access, require_write_access
+from app.models.models_saas import User
 
 router = APIRouter()
 
 @router.get("/semester/{semester_id}/subjects/", response_model=List[dict])
-def get_semester_subjects(semester_id: int, db: Session = Depends(get_db)):
+def get_semester_subjects(semester_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_read_access)):
     """Get all subjects for a semester"""
     semester_subjects = db.query(SemesterSubject).filter(
         SemesterSubject.semester_id == semester_id
@@ -30,7 +32,7 @@ def get_semester_subjects(semester_id: int, db: Session = Depends(get_db)):
     return result
 
 @router.post("/semester/{semester_id}/subjects/{subject_id}/")
-def add_subject_to_semester(semester_id: int, subject_id: int, db: Session = Depends(get_db)):
+def add_subject_to_semester(semester_id: int, subject_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_write_access)):
     """Add a subject to a semester"""
     # Check if already exists
     existing = db.query(SemesterSubject).filter(
@@ -52,7 +54,7 @@ def add_subject_to_semester(semester_id: int, subject_id: int, db: Session = Dep
     return {"message": "Subject added successfully", "id": semester_subject.id}
 
 @router.delete("/semester/{semester_id}/subjects/{subject_id}/")
-def remove_subject_from_semester(semester_id: int, subject_id: int, db: Session = Depends(get_db)):
+def remove_subject_from_semester(semester_id: int, subject_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_write_access)):
     """Remove a subject from a semester"""
     semester_subject = db.query(SemesterSubject).filter(
         SemesterSubject.semester_id == semester_id,

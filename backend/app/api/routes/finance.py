@@ -10,24 +10,27 @@ from app.schemas.schemas import (
 )
 from app.services import crud
 from app.models import models
+from app.auth.dependencies import require_read_access, require_write_access
+from app.models.models_saas import User
 
 router = APIRouter()
 
 @router.get("/position-rates", response_model=List[PositionRateResponse])
-def get_position_rates(db: Session = Depends(get_db)):
+def get_position_rates(db: Session = Depends(get_db), current_user: User = Depends(require_read_access)):
     """Get all position rates"""
     return crud.get_position_rates(db)
 
 @router.post("/position-rates", response_model=List[PositionRateResponse])
 def create_or_update_position_rates(
     rates: List[PositionRateCreate],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_write_access)
 ):
     """Create or update position rates"""
     return crud.create_or_update_position_rates(db, rates)
 
 @router.get("/position-rates/{position}")
-def get_position_rate(position: str, db: Session = Depends(get_db)):
+def get_position_rate(position: str, db: Session = Depends(get_db), current_user: User = Depends(require_read_access)):
     """Get rate for a specific position"""
     rate = crud.get_position_rate_by_position(db, position)
     if not rate:
@@ -35,7 +38,7 @@ def get_position_rate(position: str, db: Session = Depends(get_db)):
     return rate
 
 @router.delete("/position-rates/{position}")
-def delete_position_rate_endpoint(position: str, db: Session = Depends(get_db)):
+def delete_position_rate_endpoint(position: str, db: Session = Depends(get_db), current_user: User = Depends(require_write_access)):
     """Delete a position rate"""
     success = crud.delete_position_rate(db, position)
     if not success:
@@ -44,14 +47,15 @@ def delete_position_rate_endpoint(position: str, db: Session = Depends(get_db)):
 
 # Teacher Effective Load Routes
 @router.get("/effective-loads", response_model=List[TeacherEffectiveLoadResponse])
-def get_effective_loads_endpoint(db: Session = Depends(get_db)):
+def get_effective_loads_endpoint(db: Session = Depends(get_db), current_user: User = Depends(require_read_access)):
     """Get all teacher effective loads"""
     return crud.get_effective_loads(db)
 
 @router.post("/effective-loads", response_model=List[TeacherEffectiveLoadResponse])
 def create_or_update_effective_loads_endpoint(
     loads: List[TeacherEffectiveLoadCreate],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_write_access)
 ):
     """Create or update teacher effective loads"""
     # Validate that all teachers exist
@@ -66,7 +70,7 @@ def create_or_update_effective_loads_endpoint(
     return crud.create_or_update_effective_loads(db, loads)
 
 @router.get("/effective-loads/{teacher_id}", response_model=TeacherEffectiveLoadResponse)
-def get_effective_load_by_teacher_endpoint(teacher_id: int, db: Session = Depends(get_db)):
+def get_effective_load_by_teacher_endpoint(teacher_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_read_access)):
     """Get effective load for a specific teacher"""
     load = crud.get_effective_load_by_teacher(db, teacher_id)
     if not load:
@@ -74,7 +78,7 @@ def get_effective_load_by_teacher_endpoint(teacher_id: int, db: Session = Depend
     return load
 
 @router.delete("/effective-loads/{teacher_id}")
-def delete_effective_load_endpoint(teacher_id: int, db: Session = Depends(get_db)):
+def delete_effective_load_endpoint(teacher_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_write_access)):
     """Delete a teacher effective load"""
     success = crud.delete_effective_load(db, teacher_id)
     if not success:

@@ -13,9 +13,10 @@ from app.core.config_saas import settings
 engine = create_engine(
     settings.DATABASE_URL,
     pool_pre_ping=True,  # Verify connections before using
-    pool_size=10,
-    max_overflow=20,
-    echo=settings.DEBUG  # Log SQL queries in debug mode
+    pool_size=25,
+    max_overflow=30,
+    pool_recycle=1800,  # Recycle connections after 30 min
+    echo=False  # Never log SQL queries (use event listeners if needed)
 )
 
 # Session factory

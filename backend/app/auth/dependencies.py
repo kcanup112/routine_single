@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.core.database_saas import get_db
 from app.models import models_saas
 from app.auth.jwt import decode_access_token
+from app.core.cache import get_cached_user, set_cached_user
 
 security = HTTPBearer()
 
@@ -52,6 +53,14 @@ def get_current_user(
             detail="User not found or inactive",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    
+    # Cache user for subsequent requests
+    set_cached_user(user.id, {
+        "id": user.id,
+        "tenant_id": user.tenant_id,
+        "role": user.role,
+        "is_active": user.is_active,
+    })
 
     token_tenant_id = payload.get("tenant_id")
     if token_tenant_id is not None and int(token_tenant_id) != user.tenant_id:
@@ -122,5 +131,25 @@ def get_any_authenticated(current_user: models_saas.User = Depends(get_current_u
         
     Returns:
         User object
+    """
+    return current_user
+
+
+def require_write_access(current_user: models_saas.User = Depends(get_current_user)) -> models_saas.User:
+    """
+    Require write access — super_admin or admin only.
+    Viewers are blocked from write operations.
+    """
+    if current_user.role not in ['super_admin', 'admin']:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Write access denied. Admin role required."
+        )
+    return current_user
+
+
+def require_read_access(current_user: models_saas.User = Depends(get_current_user)) -> models_saas.User:
+    """
+    Require read access — any authenticated user (super_admin, admin, viewer).
     """
     return current_user

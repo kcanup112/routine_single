@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "Routine Scheduler SaaS"
     VERSION: str = "2.0.0"
     ENVIRONMENT: str = "development"
-    DEBUG: bool = True
+    DEBUG: bool = False
     
     # Database
     DATABASE_URL: str = "postgresql://kec_admin:change_me_in_production@localhost:5432/kec_routine_saas"

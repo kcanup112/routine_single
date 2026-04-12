@@ -3,7 +3,7 @@ Tenant-scoped database models
 These models represent data within each tenant's schema
 User model is in models_saas.py (public schema)
 """
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Time, Float, DateTime, Date, Text, Numeric
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Time, Float, DateTime, Date, Text, Numeric, Index
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -122,6 +122,7 @@ class Teacher(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)
+    user_id = Column(Integer, nullable=True)  # FK to public.users (cross-schema, no FK constraint)
     name = Column(String(200), nullable=False)
     abbreviation = Column(String(50), nullable=True)
     email = Column(String(255), unique=True, nullable=True)
@@ -142,6 +143,9 @@ class Teacher(Base):
 
 class TeacherSubject(Base):
     __tablename__ = "teacher_subjects"
+    __table_args__ = (
+        Index('ix_ts_teacher_subject', 'teacher_id', 'subject_id', unique=True),
+    )
     
     id = Column(Integer, primary_key=True, index=True)
     teacher_id = Column(Integer, ForeignKey("teachers.id", ondelete="CASCADE"), nullable=False)
@@ -247,6 +251,11 @@ class Room(Base):
 
 class ClassRoutineEntry(Base):
     __tablename__ = "class_routine_entries"
+    __table_args__ = (
+        Index('ix_cre_class_day_period', 'class_id', 'day_id', 'period_id'),
+        Index('ix_cre_teacher_day', 'lead_teacher_id', 'day_id'),
+        Index('ix_cre_class_subject', 'class_id', 'subject_id'),
+    )
     
     id = Column(Integer, primary_key=True, index=True)
     class_id = Column(Integer, ForeignKey("classes.id"))
@@ -256,10 +265,10 @@ class ClassRoutineEntry(Base):
     is_lab = Column(Boolean, default=False)
     is_half_lab = Column(Boolean, default=False)
     num_periods = Column(Integer, default=1)
-    lead_teacher_id = Column(Integer, ForeignKey("teachers.id"))
-    assist_teacher_1_id = Column(Integer, ForeignKey("teachers.id"), nullable=True)
-    assist_teacher_2_id = Column(Integer, ForeignKey("teachers.id"), nullable=True)
-    assist_teacher_3_id = Column(Integer, ForeignKey("teachers.id"), nullable=True)
+    lead_teacher_id = Column(Integer, ForeignKey("teachers.id", ondelete="SET NULL"), nullable=True)
+    assist_teacher_1_id = Column(Integer, ForeignKey("teachers.id", ondelete="SET NULL"), nullable=True)
+    assist_teacher_2_id = Column(Integer, ForeignKey("teachers.id", ondelete="SET NULL"), nullable=True)
+    assist_teacher_3_id = Column(Integer, ForeignKey("teachers.id", ondelete="SET NULL"), nullable=True)
     group = Column(String, nullable=True)  # For lab groups: Y, Z, Y/Z, Y/Z (Alternate)
     lab_room = Column(String, nullable=True)  # Lab room assignment
     lab_group_id = Column(String, nullable=True)  # To group multiple subjects in same lab slot
@@ -284,7 +293,7 @@ class TeacherEffectiveLoad(Base):
     __tablename__ = "teacher_effective_loads"
     
     id = Column(Integer, primary_key=True, index=True)
-    teacher_id = Column(Integer, ForeignKey("teachers.id"), unique=True, nullable=False)
+    teacher_id = Column(Integer, ForeignKey("teachers.id", ondelete="CASCADE"), unique=True, nullable=False)
     effective_load = Column(Float, nullable=False, default=20.0)
     position = Column(String, nullable=True)
     

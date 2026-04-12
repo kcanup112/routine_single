@@ -300,7 +300,7 @@ export default function Dashboard() {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Box
               component="img"
-              src="/kec logo.png"
+              src="/logo.png"
               alt="KEC"
               sx={{ width: 44, height: 44, objectFit: 'contain', borderRadius: '50%', border: '2px solid #e8edf2' }}
               onError={(e) => { e.target.style.display = 'none' }}

@@ -195,15 +195,19 @@ class CPSATRoutineSolver:
             return _shift_cache[key]
 
         # map class_id → Class ORM object (we'll need shift_id later)
-        class_objs: Dict[int, models.Class] = {}
+        # Bulk-load all target classes in one query instead of N queries
+        class_objs: Dict[int, models.Class] = {
+            c.id: c for c in db.query(models.Class).filter(
+                models.Class.id.in_(target_class_ids)
+            ).all()
+        }
         seen_pairs: Dict[int, set] = defaultdict(set)  # per-class dedup
 
         for ca in assignments:
             cid = ca["class_id"]
-            cls_obj = db.query(models.Class).filter(models.Class.id == cid).first()
+            cls_obj = class_objs.get(cid)
             if cls_obj is None:
                 continue
-            class_objs[cid] = cls_obj
 
             for subj in ca.get("subjects", []):
                 sid = subj["subject_id"]

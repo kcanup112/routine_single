@@ -92,6 +92,7 @@ export const AuthProvider = ({ children }) => {
 
   const isSuperAdmin = () => hasRole('super_admin');
   const isAdmin = () => hasRole(['super_admin', 'admin']);
+  const isViewer = () => hasRole('viewer');
   const isTeacher = () => hasRole('teacher');
   const isSchool = () => user?.institution_type === 'school';
 
@@ -103,6 +104,7 @@ export const AuthProvider = ({ children }) => {
     hasRole,
     isSuperAdmin,
     isAdmin,
+    isViewer,
     isTeacher,
     isSchool,
     isAuthenticated: !!user,

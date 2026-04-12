@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.core.database_saas import get_db
 from app.services.crud import ClassRoutineService, RoutineGeneratorService
+from app.auth.dependencies import require_read_access, require_write_access
+from app.models.models_saas import User
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/class-routines", tags=["class-routines"])
@@ -50,7 +52,7 @@ class GenerateRequest(BaseModel):
     assignments: List[ClassAssignment]
 
 @router.post("/save/")
-def save_routine(request: RoutineSaveRequest, db: Session = Depends(get_db)):
+def save_routine(request: RoutineSaveRequest, db: Session = Depends(get_db), current_user: User = Depends(require_write_access)):
     """Save or update routine for a class"""
     try:
         entries = ClassRoutineService.save_routine(db, request.class_id, request.entries, request.room_no)
@@ -59,19 +61,19 @@ def save_routine(request: RoutineSaveRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/")
-def get_all_routines(db: Session = Depends(get_db)):
+def get_all_routines(db: Session = Depends(get_db), current_user: User = Depends(require_read_access)):
     """Get all class routine entries"""
     routines = ClassRoutineService.get_all_routines(db)
     return routines
 
 @router.get("/{class_id}/")
-def get_routine_by_class(class_id: int, db: Session = Depends(get_db)):
+def get_routine_by_class(class_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_read_access)):
     """Get routine for a specific class"""
     routine = ClassRoutineService.get_routine_by_class(db, class_id)
     return routine
 
 @router.delete("/{class_id}/")
-def delete_routine(class_id: int, db: Session = Depends(get_db)):
+def delete_routine(class_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_write_access)):
     """Delete routine for a specific class"""
     success = ClassRoutineService.delete_routine(db, class_id)
     if success:
@@ -81,7 +83,8 @@ def delete_routine(class_id: int, db: Session = Depends(get_db)):
 @router.post("/check-teacher-conflict/")
 def check_teacher_conflict(
     request: TeacherConflictRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_read_access)
 ):
     """Check if a teacher has conflicts in the given time slots"""
     result = ClassRoutineService.check_teacher_conflicts(
@@ -93,6 +96,7 @@ def check_teacher_conflict(
 def generate_routine(
     request: GenerateRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_write_access),
     solver: str = "cpsat",
 ):
     """

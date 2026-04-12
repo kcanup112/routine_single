@@ -27,7 +27,13 @@ const getApiBaseUrl = () => {
     return import.meta.env.VITE_API_URL
   }
   
-  // Use the current hostname with port 8000 for API (backend is on different port)
+  // In development, use relative URLs so requests go through Vite's proxy
+  // (avoids IPv6 resolution delays on Windows where localhost -> ::1 hangs)
+  if (import.meta.env.DEV) {
+    return ''
+  }
+  
+  // In production, use the current hostname with port 8000 for API
   // This preserves subdomain for multi-tenant routing (e.g., kec.localhost:3000 -> kec.localhost:8000)
   const protocol = window.location.protocol // http: or https:
   const hostname = window.location.hostname // e.g., localhost or kec.localhost

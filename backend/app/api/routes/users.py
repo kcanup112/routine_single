@@ -1,4 +1,4 @@
-"""User management endpoints (superadmin only)"""
+"""User management endpoints (org admin and superadmin)"""
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime
@@ -18,8 +18,8 @@ class UserCreate(BaseModel):
     email: EmailStr
     full_name: str
     password: str
-    role: str  # 'super_admin', 'admin', or 'user'
-    tenant_id: int
+    role: str  # 'admin' or 'viewer' (org admin); 'super_admin' allowed only for super_admin
+    tenant_id: Optional[int] = None  # Only super_admin can specify; org admin uses own tenant
 
 
 class UserUpdate(BaseModel):
@@ -38,7 +38,7 @@ class UserResponse(BaseModel):
     is_active: bool
     tenant_id: int
     created_at: datetime
-    last_login_at: Optional[datetime]
+    last_login_at: Optional[datetime] = None
     
     class Config:
         from_attributes = True
@@ -47,36 +47,38 @@ class UserResponse(BaseModel):
 @router.post("/", response_model=UserResponse)
 def create_user(
     user_data: UserCreate,
-    current_user: User = Depends(get_superadmin),
+    current_user: User = Depends(get_admin_or_above),
     db: Session = Depends(get_db)
 ):
     """
-    Create a new user (superadmin only)
-    
-    Args:
-        user_data: New user information
-        current_user: Current superadmin user
-        db: Database session
-        
-    Returns:
-        Created user information
-        
-    Raises:
-        HTTPException: If email already exists or invalid role
+    Create a new user.
+    - Super admin: can create any role in any tenant
+    - Org admin: can only create 'admin' or 'viewer' in own tenant
     """
-    # Validate role
-    if user_data.role not in ['super_admin', 'admin', 'user']:
+    # Determine target tenant
+    if current_user.role == 'super_admin':
+        target_tenant_id = user_data.tenant_id or current_user.tenant_id
+        allowed_roles = ['super_admin', 'admin', 'viewer']
+    else:
+        # Org admin — force own tenant, prevent privilege escalation
+        target_tenant_id = current_user.tenant_id
+        allowed_roles = ['admin', 'viewer']
+
+    if user_data.role not in allowed_roles:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Role must be 'super_admin', 'admin', or 'user'"
+            detail=f"Role must be one of: {', '.join(allowed_roles)}"
         )
     
-    # Check if email already exists
-    existing_user = db.query(User).filter(User.email == user_data.email).first()
+    # Check if email already exists within the target tenant
+    existing_user = db.query(User).filter(
+        User.email == user_data.email,
+        User.tenant_id == target_tenant_id
+    ).first()
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
+            detail="Email already registered in this organization"
         )
     
     # Create new user
@@ -85,7 +87,7 @@ def create_user(
         full_name=user_data.full_name,
         password_hash=get_password_hash(user_data.password),
         role=user_data.role,
-        tenant_id=user_data.tenant_id,
+        tenant_id=target_tenant_id,
         is_active=True
     )
     
@@ -102,16 +104,14 @@ def list_users(
     db: Session = Depends(get_db)
 ):
     """
-    Get all users (admin and above)
-    
-    Args:
-        current_user: Current admin or superadmin user
-        db: Database session
-        
-    Returns:
-        List of all users
+    Get users.
+    - Super admin: all users
+    - Org admin: only users in own tenant
     """
-    users = db.query(User).order_by(User.created_at.desc()).all()
+    query = db.query(User)
+    if current_user.role != 'super_admin':
+        query = query.filter(User.tenant_id == current_user.tenant_id)
+    users = query.order_by(User.created_at.desc()).all()
     return users
 
 
@@ -122,24 +122,21 @@ def get_user(
     db: Session = Depends(get_db)
 ):
     """
-    Get user by ID (admin and above)
-    
-    Args:
-        user_id: User ID
-        current_user: Current admin or superadmin user
-        db: Database session
-        
-    Returns:
-        User information
-        
-    Raises:
-        HTTPException: If user not found
+    Get user by ID.
+    - Org admin: only users in own tenant
     """
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
+        )
+    
+    # Org admin can only see users in their own tenant
+    if current_user.role != 'super_admin' and user.tenant_id != current_user.tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
         )
     
     return user
@@ -149,23 +146,13 @@ def get_user(
 def update_user(
     user_id: int,
     user_data: UserUpdate,
-    current_user: User = Depends(get_superadmin),
+    current_user: User = Depends(get_admin_or_above),
     db: Session = Depends(get_db)
 ):
     """
-    Update user information (superadmin only)
-    
-    Args:
-        user_id: User ID to update
-        user_data: Updated user information
-        current_user: Current superadmin user
-        db: Database session
-        
-    Returns:
-        Updated user information
-        
-    Raises:
-        HTTPException: If user not found or invalid role
+    Update user information.
+    - Super admin: any user
+    - Org admin: only users in own tenant, cannot set super_admin role
     """
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -174,15 +161,27 @@ def update_user(
             detail="User not found"
         )
     
+    # Tenant scoping for org admin
+    if current_user.role != 'super_admin' and user.tenant_id != current_user.tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
+        )
+    
     # Update fields if provided
     if user_data.full_name is not None:
         user.full_name = user_data.full_name
     
     if user_data.role is not None:
-        if user_data.role not in ['super_admin', 'admin', 'user']:
+        if current_user.role == 'super_admin':
+            allowed_roles = ['super_admin', 'admin', 'viewer']
+        else:
+            allowed_roles = ['admin', 'viewer']
+        
+        if user_data.role not in allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid role"
+                detail=f"Role must be one of: {', '.join(allowed_roles)}"
             )
         user.role = user_data.role
     
@@ -199,28 +198,26 @@ def update_user(
 @router.delete("/{user_id}")
 def delete_user(
     user_id: int,
-    current_user: User = Depends(get_superadmin),
+    current_user: User = Depends(get_admin_or_above),
     db: Session = Depends(get_db)
 ):
     """
-    Delete a user (superadmin only)
-    
-    Args:
-        user_id: User ID to delete
-        current_user: Current superadmin user
-        db: Database session
-        
-    Returns:
-        Success message
-        
-    Raises:
-        HTTPException: If user not found or trying to delete self
+    Delete a user.
+    - Super admin: any user
+    - Org admin: only users in own tenant
     """
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
+        )
+    
+    # Tenant scoping
+    if current_user.role != 'super_admin' and user.tenant_id != current_user.tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
         )
     
     # Prevent deleting yourself
@@ -240,29 +237,26 @@ def delete_user(
 def reset_user_password(
     user_id: int,
     new_password: str,
-    current_user: User = Depends(get_superadmin),
+    current_user: User = Depends(get_admin_or_above),
     db: Session = Depends(get_db)
 ):
     """
-    Reset a user's password (superadmin only)
-    
-    Args:
-        user_id: User ID
-        new_password: New password
-        current_user: Current superadmin user
-        db: Database session
-        
-    Returns:
-        Success message
-        
-    Raises:
-        HTTPException: If user not found
+    Reset a user's password.
+    - Super admin: any user
+    - Org admin: only users in own tenant
     """
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
+        )
+    
+    # Tenant scoping
+    if current_user.role != 'super_admin' and user.tenant_id != current_user.tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
         )
     
     user.password_hash = get_password_hash(new_password)

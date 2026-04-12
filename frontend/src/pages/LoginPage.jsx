@@ -42,7 +42,8 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      // Use relative URL in dev (goes through Vite proxy to avoid IPv6 timeout)
+      const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '' : 'http://localhost:8000');
       const tenantSubdomain = getTenantSubdomain();
       const response = await axios.post(`${API_URL}/auth/login`, {
         email,

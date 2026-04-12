@@ -1,6 +1,8 @@
-const { app, BrowserWindow } = require('electron');
-const { spawn } = require('child_process');
-const path = require('path');
+// Electron desktop wrapper is currently DISABLED.
+// The app runs as a web application via Docker (docker compose up).
+// To re-enable, remove the early-return below.
+console.log('Electron is disabled. Use "docker compose up" to run the app.');
+if (typeof process !== 'undefined') process.exit(0);
 
 let mainWindow;
 let backendProcess;
@@ -26,10 +28,33 @@ function createWindow() {
     title: 'Routine Scheduler'
   });
 
-  // Wait for backend to start then load frontend
-  setTimeout(() => {
-    mainWindow.loadFile(path.join(__dirname, 'frontend', 'dist', 'index.html'));
-  }, 3000);
+  // Poll backend health endpoint instead of hard-coded wait
+  const http = require('http');
+  let attempts = 0;
+  const maxAttempts = 30; // 30 * 500ms = 15s max wait
+  
+  function checkBackendReady() {
+    attempts++;
+    const req = http.get('http://localhost:8000/api/health', (res) => {
+      if (res.statusCode === 200) {
+        mainWindow.loadFile(path.join(__dirname, 'frontend', 'dist', 'index.html'));
+      } else if (attempts < maxAttempts) {
+        setTimeout(checkBackendReady, 500);
+      } else {
+        mainWindow.loadFile(path.join(__dirname, 'frontend', 'dist', 'index.html'));
+      }
+    });
+    req.on('error', () => {
+      if (attempts < maxAttempts) {
+        setTimeout(checkBackendReady, 500);
+      } else {
+        mainWindow.loadFile(path.join(__dirname, 'frontend', 'dist', 'index.html'));
+      }
+    });
+    req.end();
+  }
+  
+  checkBackendReady();
 
   mainWindow.on('closed', function () {
     mainWindow = null;

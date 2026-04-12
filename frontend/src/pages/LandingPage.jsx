@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -146,6 +146,17 @@ function ScrollAppBar() {
 export default function LandingPage() {
   const navigate = useNavigate();
   const [activeFeature, setActiveFeature] = useState(0);
+
+  // Pre-compute random particle positions once (not on every render)
+  const particles = useMemo(() => 
+    Array.from({ length: 12 }, (_, i) => ({
+      width: Math.random() * 100 + 50,
+      height: Math.random() * 100 + 50,
+      left: `${Math.random() * 100}%`,
+      top: `${Math.random() * 100}%`,
+      duration: `${Math.random() * 3 + 3}s`,
+      delay: `${Math.random() * 2}s`,
+    })), []);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -309,19 +320,19 @@ export default function LandingPage() {
             opacity: 0.1,
           }}
         >
-          {[...Array(20)].map((_, i) => (
+          {particles.map((p, i) => (
             <Box
               key={i}
               sx={{
                 position: 'absolute',
-                width: Math.random() * 100 + 50,
-                height: Math.random() * 100 + 50,
+                width: p.width,
+                height: p.height,
                 borderRadius: '50%',
                 background: 'white',
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                animation: `${float} ${Math.random() * 3 + 3}s ease-in-out infinite`,
-                animationDelay: `${Math.random() * 2}s`,
+                left: p.left,
+                top: p.top,
+                animation: `${float} ${p.duration} ease-in-out infinite`,
+                animationDelay: p.delay,
               }}
             />
           ))}

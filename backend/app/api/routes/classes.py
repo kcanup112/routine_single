@@ -4,33 +4,35 @@ from typing import List
 from app.core.database_saas import get_db
 from app.schemas import schemas
 from app.services.crud import ClassService
+from app.auth.dependencies import require_read_access, require_write_access
+from app.models.models_saas import User
 
 router = APIRouter(prefix="/classes", tags=["classes"])
 
 @router.post("/", response_model=schemas.Class)
-def create_class(class_data: schemas.ClassCreate, db: Session = Depends(get_db)):
+def create_class(class_data: schemas.ClassCreate, db: Session = Depends(get_db), current_user: User = Depends(require_write_access)):
     try:
         return ClassService.create(db, class_data)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/", response_model=List[schemas.Class])
-def get_classes(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def get_classes(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(require_read_access)):
     return ClassService.get_all(db, skip, limit)
 
 @router.get("/{class_id}/", response_model=schemas.Class)
-def get_class(class_id: int, db: Session = Depends(get_db)):
+def get_class(class_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_read_access)):
     class_obj = ClassService.get_by_id(db, class_id)
     if not class_obj:
         raise HTTPException(status_code=404, detail="Class not found")
     return class_obj
 
 @router.get("/semester/{semester_id}/", response_model=List[schemas.Class])
-def get_classes_by_semester(semester_id: int, db: Session = Depends(get_db)):
+def get_classes_by_semester(semester_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_read_access)):
     return ClassService.get_by_semester(db, semester_id)
 
 @router.put("/{class_id}/", response_model=schemas.Class)
-def update_class(class_id: int, class_data: schemas.ClassUpdate, db: Session = Depends(get_db)):
+def update_class(class_id: int, class_data: schemas.ClassUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_write_access)):
     try:
         updated = ClassService.update(db, class_id, class_data)
     except ValueError as e:
@@ -40,7 +42,7 @@ def update_class(class_id: int, class_data: schemas.ClassUpdate, db: Session = D
     return updated
 
 @router.delete("/{class_id}/")
-def delete_class(class_id: int, db: Session = Depends(get_db)):
+def delete_class(class_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_write_access)):
     deleted = ClassService.delete(db, class_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Class not found")

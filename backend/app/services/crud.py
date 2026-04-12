@@ -1,5 +1,5 @@
-from sqlalchemy.orm import Session
-from sqlalchemy import text
+from sqlalchemy.orm import Session, joinedload, selectinload
+from sqlalchemy import text, func
 from app.models import models
 from app.schemas import schemas
 from typing import List, Optional
@@ -157,6 +157,23 @@ class TeacherService:
     def delete(db: Session, teacher_id: int):
         db_teacher = db.query(models.Teacher).filter(models.Teacher.id == teacher_id).first()
         if db_teacher:
+            # Nullify references in routine entries
+            db.query(models.ClassRoutineEntry).filter(
+                models.ClassRoutineEntry.lead_teacher_id == teacher_id
+            ).update({"lead_teacher_id": None}, synchronize_session=False)
+            db.query(models.ClassRoutineEntry).filter(
+                models.ClassRoutineEntry.assist_teacher_1_id == teacher_id
+            ).update({"assist_teacher_1_id": None}, synchronize_session=False)
+            db.query(models.ClassRoutineEntry).filter(
+                models.ClassRoutineEntry.assist_teacher_2_id == teacher_id
+            ).update({"assist_teacher_2_id": None}, synchronize_session=False)
+            db.query(models.ClassRoutineEntry).filter(
+                models.ClassRoutineEntry.assist_teacher_3_id == teacher_id
+            ).update({"assist_teacher_3_id": None}, synchronize_session=False)
+            # Delete effective load record
+            db.query(models.TeacherEffectiveLoad).filter(
+                models.TeacherEffectiveLoad.teacher_id == teacher_id
+            ).delete(synchronize_session=False)
             db.delete(db_teacher)
             db.commit()
         return db_teacher
@@ -722,7 +739,9 @@ class TeacherSubjectService:
     @staticmethod
     def get_teacher_subjects(db: Session, teacher_id: int):
         """Get all subjects assigned to a teacher"""
-        teacher_subjects = db.query(models.TeacherSubject).filter(
+        teacher_subjects = db.query(models.TeacherSubject).options(
+            joinedload(models.TeacherSubject.subject)
+        ).filter(
             models.TeacherSubject.teacher_id == teacher_id
         ).all()
         return [ts.subject for ts in teacher_subjects]
@@ -771,7 +790,9 @@ class TeacherSubjectService:
     @staticmethod
     def get_teachers_by_subject(db: Session, subject_id: int):
         """Get all teachers who can teach a specific subject"""
-        teacher_subjects = db.query(models.TeacherSubject).filter(
+        teacher_subjects = db.query(models.TeacherSubject).options(
+            joinedload(models.TeacherSubject.teacher)
+        ).filter(
             models.TeacherSubject.subject_id == subject_id
         ).all()
         return [ts.teacher for ts in teacher_subjects]
@@ -817,7 +838,13 @@ class ClassRoutineService:
     @staticmethod
     def get_routine_by_class(db: Session, class_id: int):
         """Get routine entries for a class"""
-        entries = db.query(models.ClassRoutineEntry).filter(
+        entries = db.query(models.ClassRoutineEntry).options(
+            joinedload(models.ClassRoutineEntry.subject),
+            joinedload(models.ClassRoutineEntry.lead_teacher),
+            joinedload(models.ClassRoutineEntry.assist_teacher_1),
+            joinedload(models.ClassRoutineEntry.assist_teacher_2),
+            joinedload(models.ClassRoutineEntry.assist_teacher_3),
+        ).filter(
             models.ClassRoutineEntry.class_id == class_id
         ).all()
         
@@ -862,8 +889,10 @@ class ClassRoutineService:
     def get_all_routines(db: Session):
         """Get all routine entries with related data"""
         try:
-            entries = db.query(models.ClassRoutineEntry).all()
-            print(f"Found {len(entries)} routine entries")
+            entries = db.query(models.ClassRoutineEntry).options(
+                joinedload(models.ClassRoutineEntry.subject),
+                joinedload(models.ClassRoutineEntry.class_).joinedload(models.Class.semester).joinedload(models.Semester.programme),
+            ).all()
             
             result = []
             for entry in entries:
@@ -921,17 +950,10 @@ class ClassRoutineService:
                         'class': class_dict,
                     })
                 except Exception as e:
-                    print(f"Error processing entry {entry.id}: {e}")
-                    import traceback
-                    traceback.print_exc()
                     continue
             
-            print(f"Returning {len(result)} processed entries")
             return result
         except Exception as e:
-            print(f"Error in get_all_routines: {e}")
-            import traceback
-            traceback.print_exc()
             return []
     
     @staticmethod
@@ -946,8 +968,6 @@ class ClassRoutineService:
     @staticmethod
     def check_teacher_conflicts(db: Session, teacher_id: int, day_id: int, period_ids: list, exclude_class_id: int = None):
         """Check if a teacher has conflicts in the given time slots (including multi-period overlaps)"""
-        print(f"Checking conflicts for teacher {teacher_id}, day {day_id}, periods {period_ids}, exclude_class {exclude_class_id}")
-        
         # Get all periods ordered by their period_number to calculate ranges
         all_periods = db.query(models.Period).order_by(models.Period.period_number).all()
         period_order_map = {p.id: p.period_number for p in all_periods}
@@ -963,8 +983,6 @@ class ClassRoutineService:
         min_checked_order = min(checked_orders)
         max_checked_order = max(checked_orders)
         
-        print(f"Checking period range: {min_checked_order} to {max_checked_order}")
-        
         # Find all assignments for this teacher on this day
         query = db.query(models.ClassRoutineEntry).filter(
             models.ClassRoutineEntry.day_id == day_id
@@ -979,7 +997,6 @@ class ClassRoutineService:
             query = query.filter(models.ClassRoutineEntry.class_id != exclude_class_id)
         
         all_assignments = query.all()
-        print(f"Found {len(all_assignments)} existing assignments for this teacher on this day")
         
         conflicts = []
         for assignment in all_assignments:
@@ -991,17 +1008,10 @@ class ClassRoutineService:
             assignment_start = assignment_period_order
             assignment_end = assignment_period_order + (assignment.num_periods - 1)
             
-            print(f"Checking assignment: period {assignment_period_order}, num_periods {assignment.num_periods}, range {assignment_start}-{assignment_end}")
-            
             # Check if ranges overlap
             # Two ranges overlap if: start1 <= end2 AND start2 <= end1
             if assignment_start <= max_checked_order and min_checked_order <= assignment_end:
-                print(f"CONFLICT DETECTED: Assignment range {assignment_start}-{assignment_end} overlaps with checked range {min_checked_order}-{max_checked_order}")
                 conflicts.append(assignment)
-            else:
-                print(f"No overlap: Assignment range {assignment_start}-{assignment_end} does not overlap with {min_checked_order}-{max_checked_order}")
-        
-        print(f"Total conflicts found: {len(conflicts)}")
         
         if conflicts:
             conflict_details = []
@@ -1012,8 +1022,6 @@ class ClassRoutineService:
                 
                 conflict_period_order = period_order_map.get(conflict.period_id, 0)
                 conflict_range = f"{conflict_period_order}-{conflict_period_order + conflict.num_periods - 1}" if conflict.num_periods > 1 else str(conflict_period_order)
-                
-                print(f"Conflict: class={class_info.name if class_info else 'Unknown'}, period range={conflict_range}, subject={subject_info.name if subject_info else 'Unknown'}")
                 
                 conflict_details.append({
                     'class_name': class_info.name if class_info else 'Unknown',
@@ -1356,8 +1364,6 @@ def create_or_update_position_rates(db: Session, rates: List[schemas.PositionRat
         if existing_rate:
             # Update existing rate
             existing_rate.rate = rate_data.rate
-            db.commit()
-            db.refresh(existing_rate)
             result.append(existing_rate)
         else:
             # Create new rate
@@ -1366,9 +1372,12 @@ def create_or_update_position_rates(db: Session, rates: List[schemas.PositionRat
                 rate=rate_data.rate
             )
             db.add(new_rate)
-            db.commit()
-            db.refresh(new_rate)
             result.append(new_rate)
+    
+    # Single commit for all changes
+    db.commit()
+    for r in result:
+        db.refresh(r)
     
     return result
 

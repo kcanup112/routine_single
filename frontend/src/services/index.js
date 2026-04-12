@@ -33,7 +33,7 @@ export const semesterService = {
 export const teacherService = {
   getAll: () => api.get('/teachers/'),
   getById: (id) => api.get(`/teachers/${id}/`),
-  create: (data) => api.post('/teachers/', data),
+  create: (data, accountRole) => api.post('/teachers/', data, { params: { account_role: accountRole || 'viewer' } }),
   update: (id, data) => api.put(`/teachers/${id}/`, data),
   delete: (id) => api.delete(`/teachers/${id}/`),
 }

@@ -384,8 +384,8 @@ def get_revenue_analytics(
     
     transactions = query.all()
     
-    # Aggregate by plan and gateway
-    total_revenue = sum(float(t.amount) for t in transactions)
+    # Aggregate by gateway
+    total_revenue = float(sum(t.amount for t in transactions)) if transactions else 0.0
     by_gateway = {}
     
     for transaction in transactions:

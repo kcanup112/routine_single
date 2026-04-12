@@ -160,6 +160,7 @@ CREATE INDEX idx_classes_shift ON classes(shift_id);
 CREATE TABLE IF NOT EXISTS teachers (
     id SERIAL PRIMARY KEY,
     department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
+    user_id INTEGER,  -- Links to public.users for login access
     
     name VARCHAR(200) NOT NULL,
     email VARCHAR(255) UNIQUE,

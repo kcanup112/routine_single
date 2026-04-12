@@ -45,8 +45,9 @@ def extract_subdomain(host: str, base_domain: str = "localhost") -> Optional[str
         # Check if it's not www or direct domain
         subdomain = parts[0]
         if subdomain not in ['www', 'api', '']:
-            # Validate subdomain format
-            if re.match(r'^[a-z0-9-]+$', subdomain):
+            # Validate subdomain format - must contain at least one letter
+            # (excludes pure numeric like '127' from IP 127.0.0.1)
+            if re.match(r'^[a-z0-9-]+$', subdomain) and re.search(r'[a-z]', subdomain):
                 return subdomain
     
     return None
@@ -56,35 +57,24 @@ async def get_tenant_from_request(request: Request, db_session):
     Get tenant from request (subdomain or header)
     Priority: X-Tenant-Subdomain header > subdomain from host
     """
-    # Debug logging
-    print(f"[TENANT] Request path: {request.url.path}")
-    print(f"[TENANT] Request method: {request.method}")
-    print(f"[TENANT] Headers: {dict(request.headers)}")
-    
     # Check header first (useful for API calls)
     subdomain = request.headers.get("X-Tenant-Subdomain")
-    print(f"[TENANT] X-Tenant-Subdomain header: {subdomain}")
     
     # If not in header, extract from host
     if not subdomain:
         host = request.headers.get("host", "")
-        print(f"[TENANT] Host header: {host}")
         subdomain = extract_subdomain(host)
-        print(f"[TENANT] Extracted subdomain: {subdomain}")
 
     # Fall back to Origin/Referer (handles frontend running on subdomain.localhost hitting backend on localhost)
     if not subdomain:
         origin_header = request.headers.get("origin") or request.headers.get("referer")
-        print(f"[TENANT] Origin/Referer header: {origin_header}")
         if origin_header:
             try:
                 parsed = urlparse(origin_header)
                 host_from_origin = parsed.hostname or ""
-                print(f"[TENANT] Host from origin: {host_from_origin}")
                 subdomain = extract_subdomain(host_from_origin)
-                print(f"[TENANT] Extracted subdomain from origin: {subdomain}")
-            except Exception as exc:
-                print(f"[TENANT] Failed to parse origin header: {exc}")
+            except Exception:
+                pass
     
     if not subdomain:
         # For development, allow tenant-less access to public endpoints
@@ -105,13 +95,29 @@ async def get_tenant_from_request(request: Request, db_session):
             detail="Tenant subdomain not found. Use subdomain or X-Tenant-Subdomain header."
         )
     
-    # Query tenant from database
+    # Check tenant cache first, then query database
     from app.models.models_saas import Tenant
+    from app.core.cache import get_cached_tenant, set_cached_tenant
     
-    tenant = db_session.query(Tenant).filter(
-        Tenant.subdomain == subdomain,
-        Tenant.deleted_at.is_(None)
-    ).first()
+    cached = get_cached_tenant(subdomain)
+    if cached:
+        # Reconstruct a lightweight tenant from cache for status/schema checks
+        tenant = db_session.query(Tenant).filter(
+            Tenant.id == cached["id"],
+            Tenant.deleted_at.is_(None)
+        ).first()
+    else:
+        tenant = db_session.query(Tenant).filter(
+            Tenant.subdomain == subdomain,
+            Tenant.deleted_at.is_(None)
+        ).first()
+        if tenant:
+            set_cached_tenant(subdomain, {
+                "id": tenant.id,
+                "subdomain": tenant.subdomain,
+                "schema_name": tenant.schema_name,
+                "status": tenant.status,
+            })
     
     if not tenant:
         raise HTTPException(

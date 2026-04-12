@@ -75,7 +75,7 @@ class User(Base):
     phone = Column(String(20))
     
     # Role & Permissions
-    role = Column(String(50), default='user')  # super_admin, admin, user
+    role = Column(String(50), default='viewer')  # super_admin, admin, viewer
     permissions = Column(JSON, default=[])  # Array of permission strings
     
     # Status

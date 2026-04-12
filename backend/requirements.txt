@@ -24,10 +24,6 @@ python-jose[cryptography]==3.3.0
 redis==5.0.1
 hiredis==2.2.3
 
-# Background Tasks
-celery==5.3.4
-flower==2.0.1
-
 # Email
 aiosmtplib==3.0.1
 

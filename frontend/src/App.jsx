@@ -4,33 +4,43 @@ import CssBaseline from '@mui/material/CssBaseline'
 import theme from './theme'
 import { AuthProvider } from './contexts/AuthContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
-import LandingPage from './pages/LandingPage'
-import LoginPage from './pages/LoginPage'
-import SignupPage from './pages/SignupPage'
-import AdminPortal from './pages/AdminPortal'
-import UnauthorizedPage from './components/auth/UnauthorizedPage'
 import Layout from './components/Layout'
-import Dashboard from './pages/Dashboard'
-import Departments from './pages/Departments'
-import Programmes from './pages/Programmes'
-import Semesters from './pages/Semesters'
-import Teachers from './pages/Teachers'
-import Subjects from './pages/Subjects'
-import Classes from './pages/Classes'
-import Days from './pages/Days'
-import Periods from './pages/Periods'
-import Shifts from './pages/Shifts'
-import Rooms from './pages/Rooms'
-import Schedules from './pages/Schedules'
-import ClassRoutine from './pages/ClassRoutine'
-import TeacherRoutine from './pages/TeacherRoutine'
-import Finance from './pages/Finance'
-import UserManagement from './pages/UserManagement'
-import AcademicCalendar from './pages/AcademicCalendar'
-import AcademicHierarchy from './pages/AcademicHierarchy'
-import SystemDashboard from './pages/admin/SystemDashboard'
-import TenantList from './pages/admin/TenantList'
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
+import { CircularProgress, Box } from '@mui/material'
+
+// Lazy-loaded pages — each becomes a separate chunk
+const LandingPage = lazy(() => import('./pages/LandingPage'))
+const LoginPage = lazy(() => import('./pages/LoginPage'))
+const SignupPage = lazy(() => import('./pages/SignupPage'))
+const AdminPortal = lazy(() => import('./pages/AdminPortal'))
+const UnauthorizedPage = lazy(() => import('./components/auth/UnauthorizedPage'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Departments = lazy(() => import('./pages/Departments'))
+const Programmes = lazy(() => import('./pages/Programmes'))
+const Semesters = lazy(() => import('./pages/Semesters'))
+const Teachers = lazy(() => import('./pages/Teachers'))
+const Subjects = lazy(() => import('./pages/Subjects'))
+const Classes = lazy(() => import('./pages/Classes'))
+const Days = lazy(() => import('./pages/Days'))
+const Periods = lazy(() => import('./pages/Periods'))
+const Shifts = lazy(() => import('./pages/Shifts'))
+const Rooms = lazy(() => import('./pages/Rooms'))
+const Schedules = lazy(() => import('./pages/Schedules'))
+const ClassRoutine = lazy(() => import('./pages/ClassRoutine'))
+const TeacherRoutine = lazy(() => import('./pages/TeacherRoutine'))
+const Finance = lazy(() => import('./pages/Finance'))
+const UserManagement = lazy(() => import('./pages/UserManagement'))
+const AcademicCalendar = lazy(() => import('./pages/AcademicCalendar'))
+const AcademicHierarchy = lazy(() => import('./pages/AcademicHierarchy'))
+const ChangePassword = lazy(() => import('./pages/ChangePassword'))
+const SystemDashboard = lazy(() => import('./pages/admin/SystemDashboard'))
+const TenantList = lazy(() => import('./pages/admin/TenantList'))
+
+const PageLoader = () => (
+  <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
+    <CircularProgress />
+  </Box>
+)
 
 function App() {
   return (
@@ -38,6 +48,7 @@ function App() {
       <CssBaseline />
       <AuthProvider>
         <Router>
+          <Suspense fallback={<PageLoader />}>
           <Routes>
             {/* Landing page - root path */}
             <Route path="/" element={<LandingPage />} />
@@ -50,13 +61,14 @@ function App() {
             
             {/* Authenticated layout - requires subdomain */}
             <Route path="/dashboard" element={<Layout />}>
-              {/* Public pages */}
+              {/* Pages accessible to all authenticated users (admin + viewer) */}
               <Route index element={<Dashboard />} />
               <Route path="class-routine" element={<ClassRoutine />} />
               <Route path="teacher-routine" element={<TeacherRoutine />} />
               <Route path="calendar" element={<AcademicCalendar />} />
+              <Route path="change-password" element={<ChangePassword />} />
               
-              {/* Protected admin routes - require authentication */}
+              {/* Protected admin routes - require admin or super_admin */}
               <Route path="departments" element={
                 <ProtectedRoute roles={['super_admin', 'admin']}>
                   <Departments />
@@ -123,9 +135,9 @@ function App() {
                 </ProtectedRoute>
               } />
               
-              {/* Superadmin only - User Management */}
+              {/* Superadmin and Admin - User Management */}
               <Route path="users" element={
-                <ProtectedRoute roles={['super_admin']}>
+                <ProtectedRoute roles={['super_admin', 'admin']}>
                   <UserManagement />
                 </ProtectedRoute>
               } />
@@ -143,6 +155,7 @@ function App() {
               } />
             </Route>
           </Routes>
+          </Suspense>
         </Router>
       </AuthProvider>
     </ThemeProvider>

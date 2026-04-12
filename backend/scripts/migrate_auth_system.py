@@ -55,7 +55,7 @@ def create_superadmin():
             email="anupkc@kec.edu.np",
             full_name="Anup KC",
             password_hash=get_password_hash("admin123"),
-            role="superadmin",
+            role="super_admin",
             is_active=True,
             teacher_id=None
         )

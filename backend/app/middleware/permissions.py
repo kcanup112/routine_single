@@ -1,10 +1,12 @@
 """
-Permission middleware to restrict system administrator access
+Permission middleware to restrict system administrator and viewer access
 System admin (tenant_id=78, subdomain='system') can only access admin routes
+Viewer users can only access read-only routine/calendar endpoints
 """
 from fastapi import Request, HTTPException, status
 from fastapi.responses import JSONResponse
 from typing import Optional
+from app.auth.jwt import decode_access_token
 
 # Routes accessible to system administrator
 SYSTEM_ADMIN_ALLOWED_ROUTES = [
@@ -35,6 +37,30 @@ TENANT_SPECIFIC_ROUTES = [
     "/teacher_subjects",
     "/class_routines",
     "/api/calendar"
+]
+
+# Routes that viewer role can access (GET only)
+VIEWER_ALLOWED_ROUTES = [
+    "/class_routines",
+    "/class-routines",
+    "/schedules",
+    "/api/calendar",
+    "/auth/me",
+    "/auth/change-password",
+    "/teachers",
+    "/classes",
+    "/days",
+    "/periods",
+    "/shifts",
+    "/departments",
+    "/programmes",
+    "/semesters",
+    "/rooms",
+    "/subjects",
+    "/semester",
+    "/teacher-subjects",
+    "/teacher_subjects",
+    "/api/users",
 ]
 
 
@@ -78,8 +104,9 @@ def is_route_allowed_for_system_admin(path: str) -> bool:
 
 async def system_admin_permission_middleware(request: Request, call_next):
     """
-    Middleware to enforce system admin access restrictions
+    Middleware to enforce system admin and viewer access restrictions
     System admin should only access admin panel, not routine management
+    Viewers can only access GET on routine/calendar/lookup routes
     
     This middleware runs BEFORE tenant_context_middleware to catch blocked routes early
     """
@@ -92,15 +119,10 @@ async def system_admin_permission_middleware(request: Request, call_next):
     subdomain_header = request.headers.get("X-Tenant-Subdomain")
     path = request.url.path
     
-    print(f"[PERMISSION] Path: {path}, Subdomain: {subdomain_header}")
-    
     # Only apply restrictions if subdomain is 'system'
     if subdomain_header == 'system' and auth_header:
-        print(f"[PERMISSION] System admin detected, checking path: {path}")
-        
         # Check if route is allowed
         if not is_route_allowed_for_system_admin(path):
-            print(f"[PERMISSION] BLOCKING system admin access to: {path}")
             cors_headers = get_cors_headers(request)
             return JSONResponse(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -109,8 +131,45 @@ async def system_admin_permission_middleware(request: Request, call_next):
                 },
                 headers=cors_headers
             )
-        else:
-            print(f"[PERMISSION] ALLOWING system admin access to: {path}")
+    
+    # Viewer role restriction — decode JWT to check role
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ", 1)[1]
+        payload = decode_access_token(token)
+        if payload and payload.get("role") == "viewer":
+            # Viewers can only use GET (and POST for change-password)
+            if request.method not in ("GET", "HEAD", "OPTIONS"):
+                # Allow POST on change-password only
+                if not (request.method == "POST" and path == "/auth/change-password"):
+                    cors_headers = get_cors_headers(request)
+                    return JSONResponse(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        content={
+                            "detail": "View-only access. You do not have permission to modify data."
+                        },
+                        headers=cors_headers
+                    )
+            
+            # For GET requests, check the route is in viewer allowed list
+            allowed = False
+            for route in VIEWER_ALLOWED_ROUTES:
+                if path.startswith(route):
+                    allowed = True
+                    break
+            
+            # Also allow docs/openapi for convenience
+            if path in ("/", "/docs", "/openapi.json", "/favicon.ico"):
+                allowed = True
+            
+            if not allowed:
+                cors_headers = get_cors_headers(request)
+                return JSONResponse(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    content={
+                        "detail": "View-only access. This resource is not available for your role."
+                    },
+                    headers=cors_headers
+                )
     
     # Continue processing request
     response = await call_next(request)

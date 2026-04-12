@@ -40,27 +40,27 @@ export const authService = {
 
 export const userService = {
   getAll: async () => {
-    const response = await api.get('/users/');
+    const response = await api.get('/api/users/');
     return response.data;
   },
 
   create: async (userData) => {
-    const response = await api.post('/users/', userData);
+    const response = await api.post('/api/users/', userData);
     return response.data;
   },
 
   update: async (userId, userData) => {
-    const response = await api.put(`/users/${userId}`, userData);
+    const response = await api.put(`/api/users/${userId}`, userData);
     return response.data;
   },
 
   delete: async (userId) => {
-    const response = await api.delete(`/users/${userId}`);
+    const response = await api.delete(`/api/users/${userId}`);
     return response.data;
   },
 
   resetPassword: async (userId, newPassword) => {
-    const response = await api.post(`/users/${userId}/reset-password`, null, {
+    const response = await api.post(`/api/users/${userId}/reset-password`, null, {
       params: { new_password: newPassword },
     });
     return response.data;

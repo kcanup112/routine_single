@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS public.users (
     phone VARCHAR(20),
     
     -- Role & Permissions
-    role VARCHAR(50) DEFAULT 'user' CHECK (role IN ('super_admin', 'admin', 'user')),
+    role VARCHAR(50) DEFAULT 'viewer' CHECK (role IN ('super_admin', 'admin', 'viewer')),
     permissions JSONB DEFAULT '[]'::jsonb,
     
     -- Status
