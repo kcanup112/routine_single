@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
+const API_TARGET = process.env.VITE_API_TARGET || 'http://127.0.0.1:8000'
+
 export default defineConfig({
   plugins: [react()],
   server: {
@@ -8,67 +10,79 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8000',
+        target: API_TARGET,
         changeOrigin: true,
       },
       '/auth': {
-        target: 'http://127.0.0.1:8000',
+        target: API_TARGET,
         changeOrigin: true,
       },
       '/departments': {
-        target: 'http://127.0.0.1:8000',
+        target: API_TARGET,
         changeOrigin: true,
       },
       '/programmes': {
-        target: 'http://127.0.0.1:8000',
+        target: API_TARGET,
         changeOrigin: true,
       },
       '/semesters': {
-        target: 'http://127.0.0.1:8000',
+        target: API_TARGET,
         changeOrigin: true,
       },
       '/classes': {
-        target: 'http://127.0.0.1:8000',
+        target: API_TARGET,
         changeOrigin: true,
       },
       '/teachers': {
-        target: 'http://127.0.0.1:8000',
+        target: API_TARGET,
         changeOrigin: true,
       },
       '/subjects': {
-        target: 'http://127.0.0.1:8000',
+        target: API_TARGET,
         changeOrigin: true,
       },
       '/schedules': {
-        target: 'http://127.0.0.1:8000',
+        target: API_TARGET,
         changeOrigin: true,
       },
       '/rooms': {
-        target: 'http://127.0.0.1:8000',
+        target: API_TARGET,
         changeOrigin: true,
       },
       '/days': {
-        target: 'http://127.0.0.1:8000',
+        target: API_TARGET,
         changeOrigin: true,
       },
       '/shifts': {
-        target: 'http://127.0.0.1:8000',
+        target: API_TARGET,
         changeOrigin: true,
       },
       '/periods': {
-        target: 'http://127.0.0.1:8000',
+        target: API_TARGET,
+        changeOrigin: true,
+      },
+      '/teacher-subjects': {
+        target: API_TARGET,
         changeOrigin: true,
       },
       '/teacher_subjects': {
-        target: 'http://127.0.0.1:8000',
+        target: API_TARGET,
+        changeOrigin: true,
+      },
+      '/semester': {
+        target: API_TARGET,
+        changeOrigin: true,
+      },
+      '/class-routines': {
+        target: API_TARGET,
         changeOrigin: true,
       },
       '/class_routines': {
-        target: 'http://127.0.0.1:8000',
+        target: API_TARGET,
         changeOrigin: true,
       },
       '/finance': {
-        target: 'http://127.0.0.1:8000',
+        target: API_TARGET,
         changeOrigin: true,
       },
     },

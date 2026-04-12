@@ -11,6 +11,7 @@ from app.middleware.tenant import tenant_context_middleware
 from app.middleware.permissions import system_admin_permission_middleware
 import os
 import logging
+import traceback
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,12 @@ async def tenant_middleware(request: Request, call_next):
 @app.middleware("http")
 async def permission_middleware(request: Request, call_next):
     return await system_admin_permission_middleware(request, call_next)
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled error on {request.method} {request.url.path}: {exc}")
+    logger.error(traceback.format_exc())
+    return JSONResponse(status_code=500, content={"detail": str(exc)})
 
 # Include existing API routers
 from app.api.routes import (

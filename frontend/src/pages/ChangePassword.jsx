@@ -7,7 +7,7 @@ import {
   Button,
   Alert,
 } from '@mui/material'
-import { authService } from '../services'
+import { authService } from '../services/authService'
 
 export default function ChangePassword() {
   const [formData, setFormData] = useState({

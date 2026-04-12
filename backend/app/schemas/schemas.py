@@ -186,7 +186,10 @@ class Teacher(TeacherBase):
     def model_validate(cls, obj, **kwargs):
         # Auto-compute has_account from user_id
         instance = super().model_validate(obj, **kwargs)
-        instance.has_account = obj.user_id is not None if hasattr(obj, 'user_id') else False
+        try:
+            instance.has_account = getattr(obj, 'user_id', None) is not None
+        except Exception:
+            instance.has_account = False
         return instance
 
 # ClassSubjectTeacher Schemas

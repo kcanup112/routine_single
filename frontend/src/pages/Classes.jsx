@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import {
   Typography,
@@ -45,19 +45,7 @@ export default function Classes() {
   const loadClasses = async () => {
     try {
       const response = await classService.getAll()
-      // Enrich class data with semester, department, and shift names
-      const enrichedClasses = response.data.map(cls => {
-        const semester = semesters.find(s => s.id === cls.semester_id)
-        const department = departments.find(d => d.id === cls.department_id)
-        const shift = shifts.find(sh => sh.id === cls.shift_id)
-        return {
-          ...cls,
-          semester_name: semester?.name || 'N/A',
-          department_name: department?.name || 'N/A',
-          shift_name: shift?.name || 'No Shift',
-        }
-      })
-      setClasses(enrichedClasses)
+      setClasses(response.data)
     } catch (error) {
       console.error('Error loading classes:', error)
     }
@@ -104,13 +92,23 @@ export default function Classes() {
     loadSemesters()
     loadRooms()
     loadShifts()
+    loadClasses()
   }, [])
 
-  useEffect(() => {
-    if (semesters.length > 0 && departments.length > 0 && shifts.length >= 0) {
-      loadClasses()
-    }
-  }, [semesters, departments, shifts])
+  // Enrich classes with lookup names whenever any data changes
+  const enrichedClasses = useMemo(() => {
+    return classes.map(cls => {
+      const semester = semesters.find(s => s.id === cls.semester_id)
+      const department = departments.find(d => d.id === cls.department_id)
+      const shift = shifts.find(sh => sh.id === cls.shift_id)
+      return {
+        ...cls,
+        semester_name: semester?.name || 'N/A',
+        department_name: department?.name || 'N/A',
+        shift_name: shift?.name || 'No Shift',
+      }
+    })
+  }, [classes, semesters, departments, shifts])
 
   const handleOpen = () => {
     setEditMode(false)
@@ -237,7 +235,7 @@ export default function Classes() {
 
       <Paper elevation={0} sx={{ border: '1px solid #e8edf2', borderRadius: '16px', overflow: 'hidden' }}>
         <DataGrid
-          rows={classes}
+          rows={enrichedClasses}
           columns={columns}
           pageSize={10}
           rowsPerPageOptions={[10]}

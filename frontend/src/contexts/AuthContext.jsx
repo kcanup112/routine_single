@@ -67,6 +67,8 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Tenant mismatch. Please login from your tenant subdomain.');
       }
       
+      // Clear any previous session before storing new credentials
+      clearAuthStorage();
       localStorage.setItem('token', access_token);
       localStorage.setItem('user', JSON.stringify(userData));
       setUser(userData);

@@ -200,6 +200,9 @@ async def tenant_context_middleware(request: Request, call_next):
         )
     except Exception as e:
         db.close()
+        import logging, traceback
+        logging.getLogger(__name__).error(f"Tenant context error on {request.method} {request.url.path}: {e}")
+        logging.getLogger(__name__).error(traceback.format_exc())
         # Return JSONResponse with CORS headers for other exceptions
         cors_headers = get_cors_headers(request)
         return JSONResponse(

@@ -795,7 +795,7 @@ class TeacherSubjectService:
         ).filter(
             models.TeacherSubject.subject_id == subject_id
         ).all()
-        return [ts.teacher for ts in teacher_subjects]
+        return [ts.teacher for ts in teacher_subjects if ts.teacher is not None]
 
 class ClassRoutineService:
     @staticmethod

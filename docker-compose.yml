@@ -97,8 +97,8 @@ services:
     container_name: kec-routine-frontend
     restart: unless-stopped
     environment:
-      VITE_API_URL: http://localhost:8000
       VITE_APP_NAME: KEC Routine Scheduler
+      VITE_API_TARGET: http://backend:8000
     ports:
       - "3000:3000"
     volumes:
