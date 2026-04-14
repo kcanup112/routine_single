@@ -15,18 +15,6 @@ import {
 } from '@mui/material';
 import { Visibility, VisibilityOff, Login as LoginIcon } from '@mui/icons-material';
 
-const getTenantSubdomain = () => {
-  const host = window.location.hostname || '';
-  const parts = host.split('.');
-  if (parts.length >= 2) {
-    const candidate = parts[0];
-    if (!['www', 'api', 'localhost'].includes(candidate)) {
-      return candidate;
-    }
-  }
-  return null;
-};
-
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -42,14 +30,10 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // Use relative URL in dev (goes through Vite proxy to avoid IPv6 timeout)
       const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '' : 'http://localhost:8000');
-      const tenantSubdomain = getTenantSubdomain();
       const response = await axios.post(`${API_URL}/auth/login`, {
         email,
         password
-      }, {
-        headers: tenantSubdomain ? { 'X-Tenant-Subdomain': tenantSubdomain } : {},
       });
 
       const { access_token, user } = response.data;
@@ -58,24 +42,9 @@ export default function LoginPage() {
       localStorage.setItem('token', access_token);
       localStorage.setItem('user', JSON.stringify(user));
 
-      // Check if superadmin
-      if (user.role === 'super_admin') {
-        // Redirect super admin to system subdomain (or localhost without subdomain)
-        const protocol = window.location.protocol;
-        const port = window.location.port ? `:${window.location.port}` : '';
-        const redirect = searchParams.get('redirect') || '/dashboard/admin/tenants';
-        
-        // Redirect to localhost without subdomain or system.localhost
-        window.location.href = `${protocol}//localhost${port}${redirect}`;
-      } else {
-        // Redirect to organization subdomain
-        const subdomain = user.tenant_subdomain;
-        const protocol = window.location.protocol;
-        const port = window.location.port ? `:${window.location.port}` : '';
-        
-        // Redirect to tenant subdomain
-        window.location.href = `${protocol}//${subdomain}.localhost${port}/dashboard`;
-      }
+      // Redirect to dashboard
+      const redirect = searchParams.get('redirect') || '/dashboard';
+      navigate(redirect);
     } catch (err) {
       console.error('Login error:', err);
       setError(err.response?.data?.detail || 'Login failed. Please check your credentials.');
@@ -291,29 +260,7 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <Box sx={{ mt: 3, textAlign: 'center' }}>
-            <Typography variant="body2" sx={{ color: '#64748b' }}>
-              Don't have an account?{' '}
-              <MuiLink
-                component="button"
-                variant="body2"
-                onClick={() => navigate('/signup')}
-                sx={{ 
-                  cursor: 'pointer',
-                  color: '#6366f1',
-                  fontWeight: 600,
-                  textDecoration: 'none',
-                  transition: 'all 0.2s ease',
-                  '&:hover': {
-                    color: '#4f46e5',
-                    textDecoration: 'underline',
-                  }
-                }}
-              >
-                Create Organization
-              </MuiLink>
-            </Typography>
-          </Box>
+
         </Paper>
         
         <Typography 

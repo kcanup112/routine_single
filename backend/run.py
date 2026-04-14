@@ -11,7 +11,7 @@ if __name__ == "__main__":
     workers = 1 if is_dev else int(os.environ.get("WEB_CONCURRENCY", 4))
     reload_mode = is_dev
     
-    # Use SaaS multi-tenant version
+    # Use single-tenant version
     uvicorn.run(
         "app.main_saas:app",
         host="0.0.0.0",

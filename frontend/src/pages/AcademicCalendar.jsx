@@ -40,7 +40,7 @@ import { DatePicker, TimePicker } from '@mui/x-date-pickers'
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider'
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns'
 import { calendarService } from '../services'
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek } from 'date-fns'
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek, differenceInDays, isWithinInterval, parseISO } from 'date-fns'
 import { formatBSDate, adToBS, nepaliMonths, englishToNepaliNumber, generateNepaliCalendarGrid, addNepaliMonths, subtractNepaliMonths } from '../utils/nepaliCalendar'
 
 const eventTypeOptions = [
@@ -70,7 +70,16 @@ export default function AcademicCalendar() {
   const [editingEvent, setEditingEvent] = useState(null)
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' })
   const [calendarType, setCalendarType] = useState('ad') // 'ad' or 'bs'
-  
+  const [isMultiDay, setIsMultiDay] = useState(false)
+  const [isSelectingEndDate, setIsSelectingEndDate] = useState(false) // for BS mode
+
+  // Parse a "YYYY-MM-DD" string as LOCAL midnight (not UTC) to avoid off-by-one timezone issues
+  const parseLocalDate = (dateStr) => {
+    if (!dateStr) return null
+    const [y, m, d] = dateStr.split('-').map(Number)
+    return new Date(y, m - 1, d)
+  }
+
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -90,8 +99,9 @@ export default function AcademicCalendar() {
 
   const fetchEvents = async () => {
     try {
-      const start = startOfMonth(currentMonth)
-      const end = endOfMonth(currentMonth)
+      // Widen range to cover full calendar grid (prev/next month overflow days)
+      const start = startOfWeek(startOfMonth(currentMonth))
+      const end = endOfWeek(endOfMonth(currentMonth))
       const response = await calendarService.getEvents({
         start_date: format(start, 'yyyy-MM-dd'),
         end_date: format(end, 'yyyy-MM-dd'),
@@ -129,6 +139,8 @@ export default function AcademicCalendar() {
       return
     }
     setSelectedDate(date)
+    setIsMultiDay(false)
+    setIsSelectingEndDate(false)
     setFormData({
       ...formData,
       start_date: date,
@@ -141,11 +153,16 @@ export default function AcademicCalendar() {
   const handleEditEvent = (event, e) => {
     e?.stopPropagation()
     setEditingEvent(event)
+    const startD = parseLocalDate(event.start_date)
+    const endD = parseLocalDate(event.end_date)
+    const multiDay = differenceInDays(endD, startD) > 0
+    setIsMultiDay(multiDay)
+    setIsSelectingEndDate(false)
     setFormData({
       title: event.title,
       description: event.description || '',
-      start_date: new Date(event.start_date),
-      end_date: new Date(event.end_date),
+      start_date: startD,
+      end_date: endD,
       event_type: event.event_type,
       is_all_day: event.is_all_day,
       start_time: event.start_time ? new Date(`1970-01-01T${event.start_time}`) : null,
@@ -170,13 +187,30 @@ export default function AcademicCalendar() {
   }
 
   const handleSaveEvent = async () => {
+    if (!formData.title || !formData.title.trim()) {
+      showSnackbar('Event title is required', 'error')
+      return
+    }
+    if (!formData.start_date) {
+      showSnackbar('Event date is required', 'error')
+      return
+    }
+    if (isMultiDay && formData.end_date < formData.start_date) {
+      showSnackbar('End date cannot be before start date', 'error')
+      return
+    }
     try {
       const eventData = {
-        ...formData,
+        title: formData.title.trim(),
+        description: formData.description || null,
         start_date: format(formData.start_date, 'yyyy-MM-dd'),
-        end_date: format(formData.end_date, 'yyyy-MM-dd'),
+        end_date: format(formData.end_date || formData.start_date, 'yyyy-MM-dd'),
+        event_type: formData.event_type,
+        is_all_day: formData.is_all_day,
         start_time: formData.is_all_day || !formData.start_time ? null : format(formData.start_time, 'HH:mm:ss'),
         end_time: formData.is_all_day || !formData.end_time ? null : format(formData.end_time, 'HH:mm:ss'),
+        location: formData.location || null,
+        status: formData.status || 'scheduled',
       }
 
       if (editingEvent) {
@@ -210,6 +244,8 @@ export default function AcademicCalendar() {
       status: 'scheduled',
     })
     setEditingEvent(null)
+    setIsMultiDay(false)
+    setIsSelectingEndDate(false)
   }
 
   const showSnackbar = (message, severity) => {
@@ -217,10 +253,12 @@ export default function AcademicCalendar() {
   }
 
   const getEventsForDate = (date) => {
+    // Normalise comparison date to local midnight so timezone doesn't shift the day
+    const cmp = new Date(date.getFullYear(), date.getMonth(), date.getDate())
     return events.filter(event => {
-      const eventStart = new Date(event.start_date)
-      const eventEnd = new Date(event.end_date)
-      return date >= eventStart && date <= eventEnd
+      const eventStart = parseLocalDate(event.start_date)
+      const eventEnd = parseLocalDate(event.end_date)
+      return cmp >= eventStart && cmp <= eventEnd
     })
   }
 
@@ -231,9 +269,10 @@ export default function AcademicCalendar() {
 
   const getUpcomingEvents = () => {
     const today = new Date()
+    const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate())
     return events
-      .filter(event => new Date(event.start_date) >= today)
-      .sort((a, b) => new Date(a.start_date) - new Date(b.start_date))
+      .filter(event => parseLocalDate(event.end_date) >= todayMidnight)
+      .sort((a, b) => parseLocalDate(a.start_date) - parseLocalDate(b.start_date))
       .slice(0, 10)
   }
 
@@ -385,7 +424,17 @@ export default function AcademicCalendar() {
                   onClick={() => {
                     setSelectedDate(day)
                     if (canEdit && isCurrentMonth) {
-                      setFormData({ ...formData, start_date: day, end_date: day })
+                      if (openDialog && isMultiDay) {
+                        // Inside dialog: route click to start or end date
+                        if (isSelectingEndDate) {
+                          setFormData(prev => ({ ...prev, end_date: day }))
+                          setIsSelectingEndDate(false)
+                        } else {
+                          setFormData(prev => ({ ...prev, start_date: day, end_date: day }))
+                        }
+                      } else {
+                        setFormData(prev => ({ ...prev, start_date: day, end_date: day }))
+                      }
                     }
                   }}
                 >
@@ -475,8 +524,9 @@ export default function AcademicCalendar() {
   }
 
   const renderEventCard = (event) => {
-    const eventDate = new Date(event.start_date)
+    const eventDate = parseLocalDate(event.start_date)
     const eventTypeConfig = eventTypeOptions.find(opt => opt.value === event.event_type)
+    const eventColor = eventTypeConfig?.color || '#1976d2'
     const eventBS = adToBS(eventDate)
     
     return (
@@ -485,7 +535,7 @@ export default function AcademicCalendar() {
         sx={{
           mb: 2,
           borderRadius: 2,
-          borderLeft: `4px solid ${event.color || '#1976d2'}`,
+          borderLeft: `4px solid ${eventColor}`,
           cursor: canEdit ? 'pointer' : 'default',
           transition: 'all 0.2s ease',
           '&:hover': {
@@ -530,21 +580,34 @@ export default function AcademicCalendar() {
             size="small"
             sx={{
               mb: 1,
-              backgroundColor: alpha(event.color || '#1976d2', 0.1),
-              color: event.color || '#1976d2',
+              backgroundColor: alpha(eventColor, 0.1),
+              color: eventColor,
               fontWeight: 'bold',
             }}
           />
           
-          {/* Dual Date Display */}
+          {/* Date Display - single or range */}
           <Box sx={{ mb: 0.5 }}>
-            <Typography variant="body2" color="text.primary" sx={{ fontWeight: 600, mb: 0.3 }}>
-              📅 {format(eventDate, 'EEEE, MMMM d, yyyy')}
-            </Typography>
-            {eventBS && (
-              <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.85rem', pl: 2.5 }}>
-                {formatBSDate(eventDate, 'long')}
-              </Typography>
+            {differenceInDays(parseLocalDate(event.end_date), parseLocalDate(event.start_date)) > 0 ? (
+              <>
+                <Typography variant="body2" color="text.primary" sx={{ fontWeight: 600, mb: 0.3 }}>
+                  📅 {format(eventDate, 'MMM d')} → {format(parseLocalDate(event.end_date), 'MMM d, yyyy')}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.85rem', pl: 2.5 }}>
+                  {differenceInDays(parseLocalDate(event.end_date), eventDate) + 1} days
+                </Typography>
+              </>
+            ) : (
+              <>
+                <Typography variant="body2" color="text.primary" sx={{ fontWeight: 600, mb: 0.3 }}>
+                  📅 {format(eventDate, 'EEEE, MMMM d, yyyy')}
+                </Typography>
+                {eventBS && (
+                  <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.85rem', pl: 2.5 }}>
+                    {formatBSDate(eventDate, 'long')}
+                  </Typography>
+                )}
+              </>
             )}
           </Box>
           
@@ -793,7 +856,9 @@ export default function AcademicCalendar() {
                       size="small"
                       startIcon={<AddIcon />}
                       onClick={() => {
-                        setFormData({ ...formData, event_date: selectedDate })
+                        setIsMultiDay(false)
+                        setIsSelectingEndDate(false)
+                        setFormData({ ...formData, start_date: selectedDate, end_date: selectedDate })
                         setEditingEvent(null)
                         setOpenDialog(true)
                       }}
@@ -823,6 +888,8 @@ export default function AcademicCalendar() {
                         variant="contained"
                         startIcon={<AddIcon />}
                         onClick={() => {
+                          setIsMultiDay(false)
+                          setIsSelectingEndDate(false)
                           setFormData({ ...formData, start_date: selectedDate, end_date: selectedDate })
                           setEditingEvent(null)
                           setOpenDialog(true)
@@ -906,7 +973,11 @@ export default function AcademicCalendar() {
           <DialogContent sx={{ pt: 3 }}>
             {calendarType === 'bs' && (
               <Alert severity="info" sx={{ mb: 2 }}>
-                💡 Click on a date in the mini calendar on the left to select the event date
+                💡 {isMultiDay
+                  ? isSelectingEndDate
+                    ? 'Now click an end date on the mini calendar'
+                    : 'Click a start date on the mini calendar, then click "Set End Date"'
+                  : 'Click a date in the mini calendar on the left to select the event date'}
               </Alert>
             )}
             <Box sx={{ pt: 1 }}>
@@ -932,39 +1003,103 @@ export default function AcademicCalendar() {
                 variant="outlined"
                 size="small"
               />
-              
+
+              {/* Multi-day toggle */}
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={isMultiDay}
+                    onChange={(e) => {
+                      setIsMultiDay(e.target.checked)
+                      if (!e.target.checked) {
+                        setFormData({ ...formData, end_date: formData.start_date })
+                        setIsSelectingEndDate(false)
+                      }
+                    }}
+                    color="primary"
+                  />
+                }
+                label="Multi-day event"
+                sx={{ mb: 3 }}
+              />
+
               {calendarType === 'bs' ? (
-                // Nepali Date Picker - Click on mini calendar to select
-                <TextField
-                  fullWidth
-                  label="Event Date (BS)"
-                  value={formData.start_date ? formatBSDate(formData.start_date, 'medium') : ''}
-                  InputProps={{
-                    readOnly: true,
-                  }}
-                  helperText={formData.start_date 
-                    ? `AD: ${format(formData.start_date, 'MMMM d, yyyy')}` 
-                    : 'Click a date on the calendar to select'}
-                  sx={{ mb: 3 }}
-                  variant="outlined"
-                  size="small"
-                />
+                // Nepali mode: read-only fields driven by mini-calendar clicks
+                <Grid container spacing={2} sx={{ mb: 3 }}>
+                  <Grid item xs={isMultiDay ? 6 : 12}>
+                    <TextField
+                      fullWidth
+                      label="Start Date (BS)"
+                      value={formData.start_date ? formatBSDate(formData.start_date, 'medium') : ''}
+                      InputProps={{ readOnly: true }}
+                      helperText={formData.start_date ? `AD: ${format(formData.start_date, 'MMM d, yyyy')}` : 'Click calendar to select'}
+                      variant="outlined"
+                      size="small"
+                      onClick={() => isMultiDay && setIsSelectingEndDate(false)}
+                      sx={{ cursor: isMultiDay ? 'pointer' : 'default',
+                        '& .MuiOutlinedInput-root': isMultiDay && !isSelectingEndDate ? { borderColor: 'primary.main', '& fieldset': { borderColor: 'primary.main', borderWidth: 2 } } : {} }}
+                    />
+                  </Grid>
+                  {isMultiDay && (
+                    <Grid item xs={6}>
+                      <TextField
+                        fullWidth
+                        label="End Date (BS)"
+                        value={formData.end_date ? formatBSDate(formData.end_date, 'medium') : ''}
+                        InputProps={{ readOnly: true }}
+                        helperText={formData.end_date ? `AD: ${format(formData.end_date, 'MMM d, yyyy')}` : 'Click calendar to select'}
+                        variant="outlined"
+                        size="small"
+                        onClick={() => setIsSelectingEndDate(true)}
+                        sx={{ cursor: 'pointer',
+                          '& .MuiOutlinedInput-root': isSelectingEndDate ? { '& fieldset': { borderColor: 'secondary.main', borderWidth: 2 } } : {} }}
+                      />
+                    </Grid>
+                  )}
+                </Grid>
               ) : (
-                // English Date Picker
-                <DatePicker
-                  label="Event Date"
-                  value={formData.start_date}
-                  onChange={(date) => setFormData({ ...formData, start_date: date, end_date: date })}
-                  slotProps={{ 
-                    textField: { 
-                      fullWidth: true, 
-                      sx: { mb: 3 },
-                      variant: "outlined",
-                      size: "small",
-                      helperText: formData.start_date ? `BS: ${formatBSDate(formData.start_date, 'medium')}` : ''
-                    } 
-                  }}
-                />
+                // AD mode: date pickers
+                <Grid container spacing={2} sx={{ mb: 3 }}>
+                  <Grid item xs={isMultiDay ? 6 : 12}>
+                    <DatePicker
+                      label={isMultiDay ? 'Start Date' : 'Event Date'}
+                      value={formData.start_date}
+                      onChange={(date) => setFormData({ ...formData, start_date: date, ...(!isMultiDay && { end_date: date }) })}
+                      slotProps={{ 
+                        textField: { 
+                          fullWidth: true,
+                          variant: 'outlined',
+                          size: 'small',
+                          helperText: formData.start_date ? `BS: ${formatBSDate(formData.start_date, 'medium')}` : ''
+                        } 
+                      }}
+                    />
+                  </Grid>
+                  {isMultiDay && (
+                    <Grid item xs={6}>
+                      <DatePicker
+                        label="End Date"
+                        value={formData.end_date}
+                        minDate={formData.start_date}
+                        onChange={(date) => setFormData({ ...formData, end_date: date })}
+                        slotProps={{ 
+                          textField: { 
+                            fullWidth: true,
+                            variant: 'outlined',
+                            size: 'small',
+                            helperText: formData.end_date ? `BS: ${formatBSDate(formData.end_date, 'medium')}` : ''
+                          } 
+                        }}
+                      />
+                    </Grid>
+                  )}
+                </Grid>
+              )}
+              {/* Duration badge for multi-day */}
+              {isMultiDay && formData.start_date && formData.end_date && formData.end_date >= formData.start_date && (
+                <Alert severity="info" icon={false} sx={{ mb: 3, py: 0.5 }}>
+                  📅 Duration: <strong>{differenceInDays(formData.end_date, formData.start_date) + 1} day{differenceInDays(formData.end_date, formData.start_date) > 0 ? 's' : ''}</strong>
+                </Alert>
               )}
               
               <TextField

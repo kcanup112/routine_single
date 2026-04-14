@@ -1,7 +1,7 @@
 -- ===================================================================
--- TENANT SCHEMA TEMPLATE
--- This SQL creates all tables within a tenant's schema
--- Run this for each new tenant after schema creation
+-- APPLICATION SCHEMA
+-- Creates all application tables (departments, teachers, classes, etc.)
+-- Run once during initial setup
 -- ===================================================================
 
 -- Shifts (Multi-shift support)

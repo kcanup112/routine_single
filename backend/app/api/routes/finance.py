@@ -11,7 +11,7 @@ from app.schemas.schemas import (
 from app.services import crud
 from app.models import models
 from app.auth.dependencies import require_read_access, require_write_access
-from app.models.models_saas import User
+from app.models.models import User
 
 router = APIRouter()
 

@@ -1,13 +1,30 @@
 """
-Tenant-scoped database models
-These models represent data within each tenant's schema
-User model is in models_saas.py (public schema)
+Database models for single-tenant Routine Scheduler
 """
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Time, Float, DateTime, Date, Text, Numeric, Index
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Time, Float, DateTime, Date, Text, Numeric, Index, JSON
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 from datetime import datetime
 from app.core.database import Base
+
+
+class User(Base):
+    """User model — admin/viewer accounts for this institution"""
+    __tablename__ = "users"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=False)
+    full_name = Column(String(200))
+    phone = Column(String(20))
+    role = Column(String(50), default='viewer')  # admin, viewer
+    permissions = Column(JSON, default=[])
+    is_active = Column(Boolean, default=True)
+    last_login = Column(DateTime)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    deleted_at = Column(DateTime, nullable=True)
 
 class Department(Base):
     __tablename__ = "departments"

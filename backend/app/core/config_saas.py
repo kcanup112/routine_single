@@ -4,13 +4,16 @@ from typing import List, Union
 
 class Settings(BaseSettings):
     # App
-    APP_NAME: str = "Routine Scheduler SaaS"
-    VERSION: str = "2.0.0"
+    APP_NAME: str = "Routine Scheduler"
+    VERSION: str = "3.0.0"
     ENVIRONMENT: str = "development"
     DEBUG: bool = False
     
+    # Institution
+    INSTITUTION_TYPE: str = "engineering"  # "engineering" or "school"
+    
     # Database
-    DATABASE_URL: str = "postgresql://kec_admin:change_me_in_production@localhost:5432/kec_routine_saas"
+    DATABASE_URL: str = "postgresql://kec_admin:change_me_in_production@localhost:5432/kec_routine"
     
     # Redis
     REDIS_URL: str = "redis://:redis_password@localhost:6379/0"
@@ -22,7 +25,7 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     
     # CORS - can be string (comma-separated) or list
-    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173,http://localhost:8000,http://kec.localhost:3000,http://*.localhost:3000"
+    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173,http://localhost:8000"
     
     # File Upload
     UPLOAD_DIR: str = "uploads"
@@ -34,15 +37,6 @@ class Settings(BaseSettings):
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
     FROM_EMAIL: str = "noreply@yourapp.com"
-    
-    # Subscription
-    TRIAL_DAYS: int = 14
-    GRACE_PERIOD_DAYS: int = 7
-    
-    # Payment
-    STRIPE_SECRET_KEY: str = ""
-    STRIPE_WEBHOOK_SECRET: str = ""
-    KHALTI_SECRET_KEY: str = ""
     
     @property
     def cors_origins(self) -> List[str]:

@@ -5,14 +5,12 @@ import theme from './theme'
 import { AuthProvider } from './contexts/AuthContext'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import Layout from './components/Layout'
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense } from 'react'
 import { CircularProgress, Box } from '@mui/material'
 
-// Lazy-loaded pages — each becomes a separate chunk
+// Lazy-loaded pages
 const LandingPage = lazy(() => import('./pages/LandingPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
-const SignupPage = lazy(() => import('./pages/SignupPage'))
-const AdminPortal = lazy(() => import('./pages/AdminPortal'))
 const UnauthorizedPage = lazy(() => import('./components/auth/UnauthorizedPage'))
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const Departments = lazy(() => import('./pages/Departments'))
@@ -33,8 +31,6 @@ const UserManagement = lazy(() => import('./pages/UserManagement'))
 const AcademicCalendar = lazy(() => import('./pages/AcademicCalendar'))
 const AcademicHierarchy = lazy(() => import('./pages/AcademicHierarchy'))
 const ChangePassword = lazy(() => import('./pages/ChangePassword'))
-const SystemDashboard = lazy(() => import('./pages/admin/SystemDashboard'))
-const TenantList = lazy(() => import('./pages/admin/TenantList'))
 
 const PageLoader = () => (
   <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
@@ -50,16 +46,15 @@ function App() {
         <Router>
           <Suspense fallback={<PageLoader />}>
           <Routes>
-            {/* Landing page - root path */}
+            {/* Root landing page */}
             <Route path="/" element={<LandingPage />} />
             
-            {/* Public routes - no authentication required */}
+            {/* Public routes */}
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/signup" element={<SignupPage />} />
-            <Route path="/admin" element={<AdminPortal />} />
+            <Route path="/signup" element={<Navigate to="/login" replace />} />
             <Route path="/unauthorized" element={<UnauthorizedPage />} />
             
-            {/* Authenticated layout - requires subdomain */}
+            {/* Authenticated layout */}
             <Route path="/dashboard" element={<Layout />}>
               {/* Pages accessible to all authenticated users (admin + viewer) */}
               <Route index element={<Dashboard />} />
@@ -68,89 +63,77 @@ function App() {
               <Route path="calendar" element={<AcademicCalendar />} />
               <Route path="change-password" element={<ChangePassword />} />
               
-              {/* Protected admin routes - require admin or super_admin */}
+              {/* Admin-only routes */}
               <Route path="departments" element={
-                <ProtectedRoute roles={['super_admin', 'admin']}>
+                <ProtectedRoute roles={['admin']}>
                   <Departments />
                 </ProtectedRoute>
               } />
               <Route path="programmes" element={
-                <ProtectedRoute roles={['super_admin', 'admin']}>
+                <ProtectedRoute roles={['admin']}>
                   <Programmes />
                 </ProtectedRoute>
               } />
               <Route path="semesters" element={
-                <ProtectedRoute roles={['super_admin', 'admin']}>
+                <ProtectedRoute roles={['admin']}>
                   <Semesters />
                 </ProtectedRoute>
               } />
               <Route path="teachers" element={
-                <ProtectedRoute roles={['super_admin', 'admin']}>
+                <ProtectedRoute roles={['admin']}>
                   <Teachers />
                 </ProtectedRoute>
               } />
               <Route path="subjects" element={
-                <ProtectedRoute roles={['super_admin', 'admin']}>
+                <ProtectedRoute roles={['admin']}>
                   <Subjects />
                 </ProtectedRoute>
               } />
               <Route path="classes" element={
-                <ProtectedRoute roles={['super_admin', 'admin']}>
+                <ProtectedRoute roles={['admin']}>
                   <Classes />
                 </ProtectedRoute>
               } />
               <Route path="days" element={
-                <ProtectedRoute roles={['super_admin', 'admin']}>
+                <ProtectedRoute roles={['admin']}>
                   <Days />
                 </ProtectedRoute>
               } />
               <Route path="periods" element={
-                <ProtectedRoute roles={['super_admin', 'admin']}>
+                <ProtectedRoute roles={['admin']}>
                   <Periods />
                 </ProtectedRoute>
               } />
               <Route path="shifts" element={
-                <ProtectedRoute roles={['super_admin', 'admin']}>
+                <ProtectedRoute roles={['admin']}>
                   <Shifts />
                 </ProtectedRoute>
               } />
               <Route path="rooms" element={
-                <ProtectedRoute roles={['super_admin', 'admin']}>
+                <ProtectedRoute roles={['admin']}>
                   <Rooms />
                 </ProtectedRoute>
               } />
               <Route path="schedules" element={
-                <ProtectedRoute roles={['super_admin', 'admin']}>
+                <ProtectedRoute roles={['admin']}>
                   <Schedules />
                 </ProtectedRoute>
               } />
               <Route path="finance" element={
-                <ProtectedRoute roles={['super_admin', 'admin']}>
+                <ProtectedRoute roles={['admin']}>
                   <Finance />
                 </ProtectedRoute>
               } />
               <Route path="academic-hierarchy" element={
-                <ProtectedRoute roles={['super_admin', 'admin']}>
+                <ProtectedRoute roles={['admin']}>
                   <AcademicHierarchy />
                 </ProtectedRoute>
               } />
               
-              {/* Superadmin and Admin - User Management */}
+              {/* Admin - User Management */}
               <Route path="users" element={
-                <ProtectedRoute roles={['super_admin', 'admin']}>
+                <ProtectedRoute roles={['admin']}>
                   <UserManagement />
-                </ProtectedRoute>
-              } />
-              
-              {/* Superadmin only - System Admin Panel */}
-              <Route path="admin/dashboard" element={
-                <ProtectedRoute roles={['super_admin']}>
-                  <SystemDashboard />
-                </ProtectedRoute>
-              } />
-              <Route path="admin/tenants" element={
-                <ProtectedRoute roles={['super_admin']}>
-                  <TenantList />
                 </ProtectedRoute>
               } />
             </Route>

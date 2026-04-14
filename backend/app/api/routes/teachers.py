@@ -5,7 +5,7 @@ from app.core.database_saas import get_db
 from app.schemas import schemas
 from app.services.crud import TeacherService
 from app.auth.dependencies import require_read_access, require_write_access
-from app.models.models_saas import User
+from app.models.models import User
 from app.models.models import Teacher as TeacherModel
 from app.auth.password import get_password_hash
 
@@ -14,7 +14,7 @@ router = APIRouter(prefix="/teachers", tags=["teachers"])
 DEFAULT_TEACHER_PASSWORD = "kec123"
 
 
-def _auto_create_account(db: Session, teacher, tenant_id: int, role: str = 'viewer'):
+def _auto_create_account(db: Session, teacher, role: str = 'viewer'):
     """Auto-create a user account for a teacher with an email.
     Returns (user, password) or (None, None) if teacher has no email.
     """
@@ -24,10 +24,9 @@ def _auto_create_account(db: Session, teacher, tenant_id: int, role: str = 'view
     if role not in ('admin', 'viewer'):
         role = 'viewer'
     
-    # Check if a user with this email already exists in this tenant
+    # Check if a user with this email already exists
     existing = db.query(User).filter(
         User.email == teacher.email,
-        User.tenant_id == tenant_id,
     ).first()
     if existing:
         # Link existing user if not already linked
@@ -39,9 +38,7 @@ def _auto_create_account(db: Session, teacher, tenant_id: int, role: str = 'view
         full_name=teacher.name,
         password_hash=get_password_hash(DEFAULT_TEACHER_PASSWORD),
         role=role,
-        tenant_id=tenant_id,
         is_active=True,
-        is_verified=True,
     )
     db.add(new_user)
     db.flush()  # Get user.id
@@ -60,9 +57,8 @@ def create_teacher(
     created = TeacherService.create(db, teacher)
     
     # Auto-create account if teacher has email
-    tenant_id = current_user.tenant_id
     teacher_obj = db.query(TeacherModel).filter(TeacherModel.id == created.id).first()
-    user_account, temp_password = _auto_create_account(db, teacher_obj, tenant_id, role=account_role)
+    user_account, temp_password = _auto_create_account(db, teacher_obj, role=account_role)
     db.commit()
     db.refresh(teacher_obj)
     

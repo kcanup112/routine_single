@@ -6,10 +6,11 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional
 
 from app.core.database_saas import get_db
-from app.models.models_saas import User, Tenant
+from app.models.models import User
 from app.auth.password import verify_password, get_password_hash
 from app.auth.jwt import create_access_token
 from app.auth.dependencies import get_current_user
+from app.core.config_saas import settings
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -26,8 +27,6 @@ class UserInfo(BaseModel):
     email: str
     full_name: str
     role: str
-    tenant_subdomain: str
-    tenant_name: str
     institution_type: Optional[str] = "engineering"
 
 
@@ -47,49 +46,16 @@ class ChangePasswordRequest(BaseModel):
 @router.post("/login", response_model=LoginResponse)
 def login(
     credentials: LoginRequest,
-    request: Request,
     db: Session = Depends(get_db),
 ):
-    """
-    Authenticate user and return JWT token
-    
-    Args:
-        credentials: Email and password
-        db: Database session
-        
-    Returns:
-        Access token and user information
-        
-    Raises:
-        HTTPException: If credentials are invalid or user is inactive
-    """
-    tenant = getattr(request.state, "tenant", None)
-
-    if tenant is not None:
-        # Tenant context available (subdomain login) – scope query to tenant.
-        user = db.query(User).filter(
-            User.email == credentials.email,
-            User.tenant_id == tenant.id,
-        ).first()
-    else:
-        # No tenant context (plain localhost login) – look up by email globally.
-        user = db.query(User).filter(
-            User.email == credentials.email,
-        ).first()
-        if user:
-            tenant = db.query(Tenant).filter(Tenant.id == user.tenant_id).first()
+    """Authenticate user and return JWT token."""
+    user = db.query(User).filter(User.email == credentials.email).first()
 
     if not user or not verify_password(credentials.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    if tenant is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Unable to determine tenant for this user.",
         )
     
     if not user.is_active:
@@ -102,14 +68,12 @@ def login(
     user.last_login = datetime.utcnow()
     db.commit()
     
-    # Create access token with user information
+    # Create access token
     access_token = create_access_token(
         data={
             "sub": str(user.id),
             "email": user.email,
             "role": user.role,
-            "tenant_id": user.tenant_id,
-            "tenant_subdomain": tenant.subdomain,
         }
     )
     
@@ -121,41 +85,20 @@ def login(
             "email": user.email,
             "full_name": user.full_name,
             "role": user.role,
-            "tenant_subdomain": tenant.subdomain,
-            "tenant_name": tenant.name,
-            "institution_type": (tenant.settings or {}).get("institution_type", "engineering")
+            "institution_type": settings.INSTITUTION_TYPE,
         }
     }
 
 
 @router.get("/me", response_model=UserInfo)
-def get_current_user_info(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """
-    Get current authenticated user information
-    
-    Args:
-        current_user: Current authenticated user from JWT token
-        db: Database session
-        
-    Returns:
-        User information
-    """
-    # Fetch tenant information
-    tenant = db.query(Tenant).filter(Tenant.id == current_user.tenant_id).first()
-    if not tenant:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Tenant not found for user"
-        )
-    
+def get_current_user_info(current_user: User = Depends(get_current_user)):
+    """Get current authenticated user information."""
     return {
         "id": current_user.id,
         "email": current_user.email,
         "full_name": current_user.full_name,
         "role": current_user.role,
-        "tenant_subdomain": tenant.subdomain,
-        "tenant_name": tenant.name,
-        "institution_type": (tenant.settings or {}).get("institution_type", "engineering")
+        "institution_type": settings.INSTITUTION_TYPE,
     }
 
 
@@ -165,28 +108,13 @@ def change_password(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """
-    Change current user's password
-    
-    Args:
-        request: Old and new passwords
-        current_user: Current authenticated user
-        db: Database session
-        
-    Returns:
-        Success message
-        
-    Raises:
-        HTTPException: If old password is incorrect
-    """
-    # Verify old password
+    """Change current user's password."""
     if not verify_password(request.old_password, current_user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Incorrect old password"
         )
     
-    # Update password
     current_user.password_hash = get_password_hash(request.new_password)
     current_user.updated_at = datetime.utcnow()
     db.commit()

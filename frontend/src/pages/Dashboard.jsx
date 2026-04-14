@@ -116,10 +116,16 @@ export default function Dashboard() {
     }
   }
 
+  const parseLocalDate = (dateStr) => {
+    if (!dateStr) return null
+    const [y, m, d] = dateStr.split('-').map(Number)
+    return new Date(y, m - 1, d)
+  }
+
   const fetchCalendarEvents = async () => {
     try {
-      const start = startOfMonth(currentMonth)
-      const end = endOfMonth(currentMonth)
+      const start = startOfWeek(startOfMonth(currentMonth))
+      const end = endOfWeek(endOfMonth(currentMonth))
       const response = await calendarService.getEvents({
         start_date: format(start, 'yyyy-MM-dd'),
         end_date: format(end, 'yyyy-MM-dd'),
@@ -131,18 +137,23 @@ export default function Dashboard() {
     }
   }
 
-  const getEventsForDate = (date) =>
-    events.filter(ev => {
-      const s = new Date(ev.start_date)
-      const e = new Date(ev.end_date)
-      return date >= s && date <= e
+  const getEventsForDate = (date) => {
+    const normalized = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+    return events.filter(ev => {
+      const s = parseLocalDate(ev.start_date)
+      const e = parseLocalDate(ev.end_date)
+      return s && e && normalized >= s && normalized <= e
     })
+  }
 
   const getUpcomingEvents = () => {
-    const today = new Date()
+    const today = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate())
     return events
-      .filter(ev => new Date(ev.end_date) >= today)
-      .sort((a, b) => new Date(a.start_date) - new Date(b.start_date))
+      .filter(ev => {
+        const e = parseLocalDate(ev.end_date)
+        return e && e >= today
+      })
+      .sort((a, b) => parseLocalDate(a.start_date) - parseLocalDate(b.start_date))
       .slice(0, 8)
   }
 
@@ -238,7 +249,7 @@ export default function Dashboard() {
                 {dayEvents.length > 0 && (
                   <Box sx={{ display: 'flex', gap: '2px', mt: '2px' }}>
                     {dayEvents.slice(0, 3).map((ev, i) => (
-                      <Box key={i} sx={{ width: 4, height: 4, borderRadius: '50%', backgroundColor: isToday ? 'rgba(255,255,255,0.9)' : (ev.color || '#2d6a6f') }} />
+                      <Box key={i} sx={{ width: 4, height: 4, borderRadius: '50%', backgroundColor: isToday ? 'rgba(255,255,255,0.9)' : (eventTypeOptions.find(o => o.value === ev.event_type)?.color || '#2d6a6f') }} />
                     ))}
                   </Box>
                 )}
@@ -489,7 +500,10 @@ export default function Dashboard() {
             )}
             {selectedEvents.length > 0 ? (
               selectedEvents.map((ev, i) => {
-                const evBS = adToBS(new Date(ev.start_date))
+                const evColor = eventTypeOptions.find(o => o.value === ev.event_type)?.color || '#2d6a6f'
+                const evStartD = parseLocalDate(ev.start_date)
+                const evEndD = parseLocalDate(ev.end_date)
+                const evIsMultiDay = evStartD && evEndD && evEndD > evStartD
                 return (
                   <Box
                     key={ev.id || i}
@@ -497,28 +511,32 @@ export default function Dashboard() {
                       mb: 1.5,
                       p: 1.5,
                       borderRadius: '12px',
-                      background: `${ev.color || '#2d6a6f'}0d`,
-                      borderLeft: `4px solid ${ev.color || '#2d6a6f'}`,
+                      background: `${evColor}0d`,
+                      borderLeft: `4px solid ${evColor}`,
                       cursor: 'pointer',
                       transition: 'all 0.15s ease',
-                      '&:hover': { background: `${ev.color || '#2d6a6f'}18` },
+                      '&:hover': { background: `${evColor}18` },
                     }}
                     onClick={() => navigate('/dashboard/calendar')}
                   >
                     <Typography variant="body2" sx={{ fontWeight: 700, color: '#1a2332', fontSize: '0.82rem', mb: 0.25 }}>
                       {ev.title}
                     </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                       <Chip
                         label={eventTypeOptions.find(o => o.value === ev.event_type)?.label || ev.event_type}
                         size="small"
-                        sx={{ height: 18, fontSize: '0.62rem', backgroundColor: `${ev.color || '#2d6a6f'}20`, color: ev.color || '#2d6a6f', fontWeight: 700, '& .MuiChip-label': { px: 1 } }}
+                        sx={{ height: 18, fontSize: '0.62rem', backgroundColor: `${evColor}20`, color: evColor, fontWeight: 700, '& .MuiChip-label': { px: 1 } }}
                       />
-                      {!ev.is_all_day && ev.start_time && (
+                      {evIsMultiDay ? (
+                        <Typography variant="caption" sx={{ color: '#8896a4', fontSize: '0.68rem' }}>
+                          {format(evStartD, 'MMM d')} → {format(evEndD, 'MMM d')}
+                        </Typography>
+                      ) : !ev.is_all_day && ev.start_time ? (
                         <Typography variant="caption" sx={{ color: '#8896a4', fontSize: '0.68rem' }}>
                           {ev.start_time.substring(0, 5)}{ev.end_time && ` — ${ev.end_time.substring(0, 5)}`}
                         </Typography>
-                      )}
+                      ) : null}
                     </Box>
                   </Box>
                 )
@@ -540,36 +558,42 @@ export default function Dashboard() {
                 <Typography variant="caption" sx={{ fontWeight: 700, color: '#8896a4', textTransform: 'uppercase', letterSpacing: '0.6px', fontSize: '0.68rem', display: 'block', mt: 2, mb: 1.5 }}>
                   Upcoming Events
                 </Typography>
-                {upcomingEvents.filter(ev => !selectedEvents.find(se => se.id === ev.id)).slice(0, 5).map((ev, i) => (
-                  <Box
-                    key={ev.id || i}
-                    sx={{
-                      mb: 1.5,
-                      p: 1.5,
-                      borderRadius: '12px',
-                      background: '#f8fafc',
-                      borderLeft: `4px solid ${ev.color || '#2d6a6f'}`,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                      '&:hover': { background: '#f0f4f8' },
-                    }}
-                    onClick={() => navigate('/dashboard/calendar')}
-                  >
-                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#1a2332', fontSize: '0.82rem', mb: 0.25 }}>
-                      {ev.title}
-                    </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                      <Typography variant="caption" sx={{ color: '#8896a4', fontSize: '0.68rem' }}>
-                        {format(new Date(ev.start_date), 'MMM d, yyyy')}
+                {upcomingEvents.filter(ev => !selectedEvents.find(se => se.id === ev.id)).slice(0, 5).map((ev, i) => {
+                  const upColor = eventTypeOptions.find(o => o.value === ev.event_type)?.color || '#2d6a6f'
+                  const upStartD = parseLocalDate(ev.start_date)
+                  const upEndD = parseLocalDate(ev.end_date)
+                  const upIsMultiDay = upStartD && upEndD && upEndD > upStartD
+                  return (
+                    <Box
+                      key={ev.id || i}
+                      sx={{
+                        mb: 1.5,
+                        p: 1.5,
+                        borderRadius: '12px',
+                        background: '#f8fafc',
+                        borderLeft: `4px solid ${upColor}`,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        '&:hover': { background: '#f0f4f8' },
+                      }}
+                      onClick={() => navigate('/dashboard/calendar')}
+                    >
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: '#1a2332', fontSize: '0.82rem', mb: 0.25 }}>
+                        {ev.title}
                       </Typography>
-                      <Chip
-                        label={eventTypeOptions.find(o => o.value === ev.event_type)?.label || ev.event_type}
-                        size="small"
-                        sx={{ height: 16, fontSize: '0.6rem', backgroundColor: `${ev.color || '#2d6a6f'}18`, color: ev.color || '#2d6a6f', fontWeight: 700, '& .MuiChip-label': { px: 0.75 } }}
-                      />
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                        <Typography variant="caption" sx={{ color: '#8896a4', fontSize: '0.68rem' }}>
+                          {upStartD && format(upStartD, 'MMM d, yyyy')}{upIsMultiDay && upEndD ? ` → ${format(upEndD, 'MMM d')}` : ''}
+                        </Typography>
+                        <Chip
+                          label={eventTypeOptions.find(o => o.value === ev.event_type)?.label || ev.event_type}
+                          size="small"
+                          sx={{ height: 16, fontSize: '0.6rem', backgroundColor: `${upColor}18`, color: upColor, fontWeight: 700, '& .MuiChip-label': { px: 0.75 } }}
+                        />
+                      </Box>
                     </Box>
-                  </Box>
-                ))}
+                  )
+                })}
               </>
             )}
 

@@ -4,7 +4,7 @@ from typing import List, Optional
 from datetime import date
 from app.core.database_saas import get_db
 from app.models.models import CalendarEvent
-from app.models.models_saas import User
+from app.models.models import User
 from app.schemas.calendar_schemas import CalendarEvent as CalendarEventSchema, CalendarEventCreate, CalendarEventUpdate
 from app.auth.dependencies import require_read_access, require_write_access
 

@@ -5,7 +5,7 @@ from app.core.database_saas import get_db
 from app.schemas import schemas
 from app.services.crud import ClassService
 from app.auth.dependencies import require_read_access, require_write_access
-from app.models.models_saas import User
+from app.models.models import User
 
 router = APIRouter(prefix="/classes", tags=["classes"])
 

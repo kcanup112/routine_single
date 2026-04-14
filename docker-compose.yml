@@ -7,7 +7,7 @@ services:
     container_name: kec-routine-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: kec_routine_saas
+      POSTGRES_DB: kec_routine
       POSTGRES_USER: kec_admin
       POSTGRES_PASSWORD: ${DB_PASSWORD:-kec_routine_2024_secure}
       PGDATA: /var/lib/postgresql/data/pgdata
@@ -17,7 +17,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./init-scripts:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kec_admin -d kec_routine_saas"]
+      test: ["CMD-SHELL", "pg_isready -U kec_admin -d kec_routine"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -42,26 +42,6 @@ services:
     networks:
       - kec-network
 
-  # PgBouncer (Connection Pooling)
-  pgbouncer:
-    image: edoburu/pgbouncer:latest
-    container_name: kec-routine-pgbouncer
-    restart: unless-stopped
-    environment:
-      DATABASE_URL: postgres://kec_admin:${DB_PASSWORD:-kec_routine_2024_secure}@postgres:5432/kec_routine_saas
-      POOL_MODE: session
-      MAX_CLIENT_CONN: 1000
-      DEFAULT_POOL_SIZE: 25
-      MIN_POOL_SIZE: 5
-      RESERVE_POOL_SIZE: 5
-    ports:
-      - "6432:5432"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - kec-network
-
   # Backend API (FastAPI)
   backend:
     build:
@@ -72,8 +52,7 @@ services:
     env_file:
       - .env
     environment:
-      # Override with container network values
-      DATABASE_URL: postgresql://kec_admin:${DB_PASSWORD:-kec_routine_2024_secure}@postgres:5432/kec_routine_saas
+      DATABASE_URL: postgresql://kec_admin:${DB_PASSWORD:-kec_routine_2024_secure}@postgres:5432/kec_routine
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secure_2024}@redis:6379/0
     ports:
       - "8000:8000"

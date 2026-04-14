@@ -4,7 +4,7 @@ from typing import List, Optional
 from app.core.database_saas import get_db
 from app.services.crud import ClassRoutineService, RoutineGeneratorService
 from app.auth.dependencies import require_read_access, require_write_access
-from app.models.models_saas import User
+from app.models.models import User
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/class-routines", tags=["class-routines"])

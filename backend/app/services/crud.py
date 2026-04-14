@@ -7,28 +7,9 @@ from datetime import datetime, time, timedelta
 
 
 def get_institution_type(db: Session) -> str:
-    """
-    Return the institution_type for the current tenant.
-    Reads the schema from the active search_path, then queries public.tenants.
-    Falls back to "engineering" if not found.
-    """
-    try:
-        result = db.execute(text("SELECT current_schema()")).scalar()
-        schema_name = result if result and result != "public" else None
-        if not schema_name:
-            return "engineering"
-        from app.models.models_saas import Tenant
-        tenant = db.execute(
-            text("SELECT settings FROM public.tenants WHERE schema_name = :s"),
-            {"s": schema_name}
-        ).fetchone()
-        if tenant and tenant[0]:
-            settings = tenant[0]
-            if isinstance(settings, dict):
-                return settings.get("institution_type", "engineering")
-    except Exception:
-        pass
-    return "engineering"
+    """Return the institution_type from app config."""
+    from app.core.config_saas import settings
+    return getattr(settings, 'INSTITUTION_TYPE', 'engineering')
 
 
 class DepartmentService:

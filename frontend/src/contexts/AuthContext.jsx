@@ -3,18 +3,6 @@ import { authService } from '../services/authService';
 
 const AuthContext = createContext(null);
 
-const getCurrentSubdomain = () => {
-  const host = window.location.hostname || '';
-  const parts = host.split('.');
-  if (parts.length >= 2) {
-    const candidate = parts[0];
-    if (!['www', 'api', 'localhost', '127'].includes(candidate)) {
-      return candidate;
-    }
-  }
-  return null;
-};
-
 const clearAuthStorage = () => {
   localStorage.removeItem('token');
   localStorage.removeItem('user');
@@ -25,26 +13,13 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is logged in on mount
     const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
     
     if (token && userData) {
       try {
         const parsed = JSON.parse(userData);
-        const currentSubdomain = getCurrentSubdomain();
-
-        // Prevent cross-tenant session reuse when switching subdomains.
-        if (
-          currentSubdomain &&
-          parsed?.tenant_subdomain &&
-          parsed.tenant_subdomain !== currentSubdomain
-        ) {
-          clearAuthStorage();
-          setUser(null);
-        } else {
-          setUser(parsed);
-        }
+        setUser(parsed);
       } catch (error) {
         console.error('Failed to parse user data:', error);
         clearAuthStorage();
@@ -57,17 +32,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await authService.login(email, password);
       const { access_token, user: userData } = response.data;
-
-      const currentSubdomain = getCurrentSubdomain();
-      if (
-        currentSubdomain &&
-        userData?.tenant_subdomain &&
-        userData.tenant_subdomain !== currentSubdomain
-      ) {
-        throw new Error('Tenant mismatch. Please login from your tenant subdomain.');
-      }
       
-      // Clear any previous session before storing new credentials
       clearAuthStorage();
       localStorage.setItem('token', access_token);
       localStorage.setItem('user', JSON.stringify(userData));
@@ -92,10 +57,8 @@ export const AuthProvider = ({ children }) => {
     return user.role === roles;
   };
 
-  const isSuperAdmin = () => hasRole('super_admin');
-  const isAdmin = () => hasRole(['super_admin', 'admin']);
+  const isAdmin = () => hasRole('admin');
   const isViewer = () => hasRole('viewer');
-  const isTeacher = () => hasRole('teacher');
   const isSchool = () => user?.institution_type === 'school';
 
   const value = {
@@ -104,10 +67,8 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     hasRole,
-    isSuperAdmin,
     isAdmin,
     isViewer,
-    isTeacher,
     isSchool,
     isAuthenticated: !!user,
   };

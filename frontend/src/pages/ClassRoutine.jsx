@@ -803,7 +803,7 @@ export default function ClassRoutine() {
 
     // Row 1: Institution Name (centered, merged)
     const user = JSON.parse(localStorage.getItem('user') || '{}')
-    const institutionName = user.tenant_name || 'Institution'
+    const institutionName = 'Institution'
     wsData.push([institutionName])
     
     // Row 2: Class Routine (centered)
@@ -1265,7 +1265,7 @@ export default function ClassRoutine() {
 
         // Header rows
         const user = JSON.parse(localStorage.getItem('user') || '{}')
-        const institutionName = user.tenant_name || 'Institution'
+        const institutionName = 'Institution'
         wsData.push([institutionName])
         wsData.push(['Class Routine'])
         

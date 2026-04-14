@@ -162,7 +162,7 @@ export default function Layout() {
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
         }}>
-          📚 {user?.tenant_name?.split(' ').map(w => w[0]).join('').toUpperCase() || 'Routine'}
+          📚 {'Routine'}
         </Typography>
         <IconButton 
           size="small" 
@@ -182,34 +182,8 @@ export default function Layout() {
       </Toolbar>
       
       <List sx={{ px: 1, py: 2 }}>
-        {/* Super Admin - Only show Tenant Management */}
-        {isAuthenticated && user?.role === 'super_admin' ? (
           <>
-            <ListItem disablePadding sx={{ mb: 0.5 }}>
-              <ListItemButton 
-                onClick={() => handleNavigation('/dashboard/admin/tenants')}
-                sx={{ 
-                  borderRadius: 2,
-                  py: 1.5,
-                  bgcolor: 'rgba(245, 158, 11, 0.1)',
-                  '&:hover': {
-                    bgcolor: 'rgba(245, 158, 11, 0.15)',
-                  },
-                }}
-              >
-                <ListItemIcon sx={{ color: '#d97706', minWidth: 40 }}>
-                  <Business />
-                </ListItemIcon>
-                <ListItemText 
-                  primary="Tenant Management" 
-                  primaryTypographyProps={{ fontWeight: 600, color: '#d97706', fontSize: '0.9375rem' }}
-                />
-              </ListItemButton>
-            </ListItem>
-          </>
-        ) : (
-          <>
-            {/* Dashboard/Home - Always visible for non-super_admin */}
+            {/* Dashboard/Home - Always visible */}
             <ListItem disablePadding sx={{ mb: 0.5 }}>
               <ListItemButton 
                 onClick={() => handleNavigation('/dashboard')}
@@ -231,7 +205,7 @@ export default function Layout() {
               </ListItemButton>
             </ListItem>
             
-            {/* Class & Teacher Routine - Always visible for all users except super_admin */}
+            {/* Class & Teacher Routine - Always visible for all users */}
             <ListItem disablePadding sx={{ mb: 0.5 }}>
               <ListItemButton 
                 onClick={() => handleNavigation('/dashboard/class-routine')}
@@ -297,7 +271,7 @@ export default function Layout() {
             
             {isAuthenticated && <Divider sx={{ my: 2, borderColor: '#e2e8f0' }} />}
             
-            {/* Collapsible Sections - Only for authenticated admin users (not super_admin) */}
+            {/* Collapsible Sections - Only for authenticated admin users */}
             {isAuthenticated && isAdmin() && menuSections.map((section) => (
               <Box key={section.title} sx={{ mb: 1 }}>
                 <ListItemButton 
@@ -352,7 +326,7 @@ export default function Layout() {
             
             {isAuthenticated && isAdmin() && <Divider sx={{ my: 2, borderColor: '#e2e8f0' }} />}
             
-            {/* Load Report & Finance - Admin only (not super_admin) */}
+            {/* Load Report & Finance - Admin only */}
             {isAuthenticated && isAdmin() && (
               <>
                 <ListItem disablePadding sx={{ mb: 0.5 }}>
@@ -422,7 +396,6 @@ export default function Layout() {
               </>
             )}
           </>
-        )}
         
         {/* Login button for unauthenticated users */}
         {!isAuthenticated && (
@@ -525,7 +498,7 @@ export default function Layout() {
           />
           
           <Typography variant="h6" noWrap component="div" sx={{ fontWeight: 700, color: '#0f172a' }}>
-            {user?.tenant_name || 'Routine Scheduler'}
+            {'Routine Scheduler'}
           </Typography>
           <Box sx={{ flexGrow: 1 }} />
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -541,8 +514,8 @@ export default function Layout() {
                   size="small"
                   sx={{ 
                     fontWeight: 600,
-                    bgcolor: user?.role === 'super_admin' ? 'rgba(239, 68, 68, 0.1)' : user?.role === 'admin' ? 'rgba(245, 158, 11, 0.1)' : user?.role === 'viewer' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)',
-                    color: user?.role === 'super_admin' ? '#dc2626' : user?.role === 'admin' ? '#d97706' : user?.role === 'viewer' ? '#10b981' : '#2563eb',
+                    bgcolor: user?.role === 'admin' ? 'rgba(245, 158, 11, 0.1)' : user?.role === 'viewer' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                    color: user?.role === 'admin' ? '#d97706' : user?.role === 'viewer' ? '#10b981' : '#2563eb',
                   }}
                 />
                 <IconButton
@@ -578,7 +551,7 @@ export default function Layout() {
                     </ListItemIcon>
                     Change Password
                   </MenuItem>
-                  {(user?.role === 'super_admin' || user?.role === 'admin') && (
+                  {user?.role === 'admin' && (
                   <MenuItem onClick={() => { handleClose(); navigate('/dashboard/users'); }}>
                     <ListItemIcon>
                       <ManageAccounts fontSize="small" />

@@ -29,21 +29,10 @@ from typing import Dict, List, Set, Tuple
 
 from ortools.sat.python import cp_model
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
 
 from app.models import models
 
 logger = logging.getLogger(__name__)
-
-# ── objective weights & soft-limit constants ────────────────────────────
-MAX_PERIODS_PER_CLASS_DAY   = 6   # soft limit: penalise > this per class per day
-MAX_PERIODS_PER_TEACHER_DAY = 5   # soft limit: penalise > this per teacher per day
-SUBJECT_SPREAD_THRESHOLD    = 2   # allow up to 2 blocks/subject/day before penalty
-WEIGHT_SUBJECT_SPREAD  = 5
-WEIGHT_CLASS_BALANCE   = 4
-WEIGHT_TEACHER_BALANCE = 6
-WEIGHT_TIME_PREFERENCE = 1        # multiplied by period_number, so kept small
-WEIGHT_CONSEC_REWARD   = 4
 
 # ── helpers ─────────────────────────────────────────────────────────────
 
@@ -218,7 +207,6 @@ class CPSATRoutineSolver:
             cid = ca["class_id"]
             cls_obj = class_objs.get(cid)
             if cls_obj is None:
-                warnings.append({"class_id": cid, "reason": "Class not found in database"})
                 continue
 
             for subj in ca.get("subjects", []):
@@ -368,53 +356,29 @@ class CPSATRoutineSolver:
                 model.add(sum(var_list) <= 1)
 
         # ── soft objectives ─────────────────────────────────────────────
-        penalty_terms: list = []
+        # S1 – bonus for block_size=2 placed as actual consecutive pair (always true
+        #       for size-2 blocks since their starts are adjacent pairs).
+        #       We weight size-2 blocks higher in the objective so the solver
+        #       prefers giving them good slots rather than failing them.
+        #       (All blocks are mandatory via H1, but the objective guides WHERE.)
+        #
+        # S2 – day-spread: penalise placing >1 block of same subject on same day.
+        penalty_vars: list = []
+        SPREAD_PENALTY = 3  # cost per extra block on same day
 
-        # S1 – subject spread: penalise > SUBJECT_SPREAD_THRESHOLD blocks per class-subject-day
         for (cid, sid, did), var_list in subj_day_vars.items():
-            if len(var_list) <= SUBJECT_SPREAD_THRESHOLD:
+            if len(var_list) <= 1:
                 continue
+            # how many blocks land on this day? sum(var_list)
+            # we want at most 1 → penalise anything above 1
             total = model.new_int_var(0, len(var_list), f"sd_{cid}_{sid}_{did}")
             model.add(total == sum(var_list))
-            excess = model.new_int_var(0, len(var_list) - SUBJECT_SPREAD_THRESHOLD,
-                                       f"sdx_{cid}_{sid}_{did}")
-            model.add(excess >= total - SUBJECT_SPREAD_THRESHOLD)
-            penalty_terms.append(WEIGHT_SUBJECT_SPREAD * excess)
+            excess = model.new_int_var(0, len(var_list) - 1, f"sdx_{cid}_{sid}_{did}")
+            model.add(excess >= total - 1)
+            penalty_vars.append(excess)
 
-        # S2 – class daily balance: penalise > MAX_PERIODS_PER_CLASS_DAY
-        class_day: Dict[Tuple[int, int], list] = defaultdict(list)
-        for (cid, did, _pn), var_list in class_slot_vars.items():
-            class_day[(cid, did)].extend(var_list)
-        for (cid, did), var_list in class_day.items():
-            total = model.new_int_var(0, len(var_list), f"cd_{cid}_{did}")
-            model.add(total == sum(var_list))
-            excess = model.new_int_var(0, len(var_list), f"cdx_{cid}_{did}")
-            model.add(excess >= total - MAX_PERIODS_PER_CLASS_DAY)
-            penalty_terms.append(WEIGHT_CLASS_BALANCE * excess)
-
-        # S3 – teacher daily balance: penalise > MAX_PERIODS_PER_TEACHER_DAY
-        teacher_day: Dict[Tuple[int, int], list] = defaultdict(list)
-        for (tid, did, _pn), var_list in teacher_slot_vars.items():
-            teacher_day[(tid, did)].extend(var_list)
-        for (tid, did), var_list in teacher_day.items():
-            total = model.new_int_var(0, len(var_list), f"td_{tid}_{did}")
-            model.add(total == sum(var_list))
-            excess = model.new_int_var(0, len(var_list), f"tdx_{tid}_{did}")
-            model.add(excess >= total - MAX_PERIODS_PER_TEACHER_DAY)
-            penalty_terms.append(WEIGHT_TEACHER_BALANCE * excess)
-
-        # S4 – time preference: favour earlier periods
-        for (bidx, did, pn_start), var in x.items():
-            penalty_terms.append(WEIGHT_TIME_PREFERENCE * pn_start * var)
-
-        # S5 – consecutive reward: encourage 2-period blocks
-        for b in blocks:
-            if b["size"] == 2 and b["idx"] in placeable_block_indices:
-                for var, _, _ in block_vars[b["idx"]]:
-                    penalty_terms.append(-WEIGHT_CONSEC_REWARD * var)
-
-        if penalty_terms:
-            model.minimize(sum(penalty_terms))
+        if penalty_vars:
+            model.minimize(SPREAD_PENALTY * sum(penalty_vars))
 
         # ── 5. solve ────────────────────────────────────────────────────
         solver = cp_model.CpSolver()
@@ -476,21 +440,9 @@ class CPSATRoutineSolver:
                     break  # exactly one var is true per block
 
         # ── 7. bulk write ───────────────────────────────────────────────
-        try:
-            for entry in new_entries:
-                db.add(entry)
-            db.commit()
-        except IntegrityError as e:
-            db.rollback()
-            logger.error("Database integrity error during routine commit: %s", e)
-            return {
-                "placed": 0,
-                "unplaced": unplaceable,
-                "class_results": [],
-                "solver_status": solver.status_name(status),
-                "error": "Database constraint violation (duplicate slot or missing foreign key). Changes rolled back.",
-                "warnings": warnings or None,
-            }
+        for entry in new_entries:
+            db.add(entry)
+        db.commit()
 
         total_placed = sum(placed_per_class.values())
 

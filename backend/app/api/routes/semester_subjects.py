@@ -5,7 +5,7 @@ from app.core.database_saas import get_db
 from app.models.models import SemesterSubject, Subject
 from app.schemas.schemas import SemesterSubjectCreate, SemesterSubject as SemesterSubjectSchema
 from app.auth.dependencies import require_read_access, require_write_access
-from app.models.models_saas import User
+from app.models.models import User
 
 router = APIRouter()
 

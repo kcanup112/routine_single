@@ -21,7 +21,6 @@ import {
   Select,
   MenuItem,
   Alert,
-  Chip,
   Snackbar,
   Menu,
   ListItemIcon,
@@ -30,7 +29,6 @@ import {
   Button,
   Tooltip,
 } from '@mui/material'
-import AccountTreeIcon from '@mui/icons-material/AccountTree'
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
 import PersonAddIcon from '@mui/icons-material/PersonAdd'
@@ -122,6 +120,7 @@ export default function AcademicHierarchy() {
   const [addNodeMenuAnchor, setAddNodeMenuAnchor] = useState(null)
   const [loadingItems, setLoadingItems] = useState(false)
   const [generating, setGenerating] = useState(false)
+  const [panelExpanded, setPanelExpanded] = useState(false)
 
   // Right-click context menu
   const [contextMenu, setContextMenu] = useState(null)
@@ -474,42 +473,23 @@ export default function AcademicHierarchy() {
       .map((n) => parseNodeId(n.id).subjectId)
   }, [nodes, dialogTarget])
 
-  const stats = useMemo(() => ({
-    semCount: nodes.filter((n) => n.type === 'semester').length,
-    clsCount: nodes.filter((n) => n.type === 'class').length,
-    subCount: nodes.filter((n) => n.type === 'subject').length,
-    teacherCount: nodes.filter((n) => n.type === 'teacher').length,
-  }), [nodes])
-
   return (
     <Box sx={{ p: 3, height: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column' }}>
       {/* Header */}
-      <Paper elevation={0} sx={{ p: 2, mb: 2, borderRadius: 3, background: 'linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%)', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <AccountTreeIcon sx={{ fontSize: 28, color: '#6366f1' }} />
-          <Box>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>Academic Hierarchy</Typography>
-            <Typography variant="body2" sx={{ color: '#64748b' }}>
-              Drag to select nodes • Right-click Class/Subject to add • Hold E + click connector to delete it
-            </Typography>
-          </Box>
-        </Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-          <Chip label={`${stats.semCount} ${school ? 'Classes' : 'Semesters'}`} size="small" sx={{ bgcolor: '#1e3a5f', color: '#fff' }} />
-          <Chip label={`${stats.clsCount} ${school ? 'Sections' : 'Classes'}`} size="small" sx={{ bgcolor: '#f3e5f5', color: '#6a1b9a' }} />
-          <Chip label={`${stats.subCount} Subjects`} size="small" sx={{ bgcolor: '#e3f2fd', color: '#1565c0' }} />
-          <Chip label={`${stats.teacherCount} Teachers`} size="small" sx={{ bgcolor: '#e8f5e9', color: '#2e7d32' }} />
-          {!school && (
-            <FormControl size="small" sx={{ minWidth: 200 }}>
-              <InputLabel>Filter by Programme</InputLabel>
-              <Select value={selectedProgramme} onChange={handleProgrammeChange} label="Filter by Programme">
-                <MenuItem value="">All Programmes</MenuItem>
-                {programmes.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
-              </Select>
-            </FormControl>
-          )}
-        </Box>
-      </Paper>
+      <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+        <Typography variant="caption" sx={{ color: '#94a3b8', fontSize: '0.7rem' }}>
+          Drag to select • Right-click to add • Hold E + click edge to delete
+        </Typography>
+        {!school && (
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel>Filter by Programme</InputLabel>
+            <Select value={selectedProgramme} onChange={handleProgrammeChange} label="Filter by Programme">
+              <MenuItem value="">All Programmes</MenuItem>
+              {programmes.map((p) => <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>)}
+            </Select>
+          </FormControl>
+        )}
+      </Box>
 
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
 
@@ -544,45 +524,69 @@ export default function AcademicHierarchy() {
             <MiniMap nodeColor={miniMapNodeColor} nodeStrokeWidth={2} style={{ borderRadius: 8 }} pannable zoomable />
             <Background variant="dots" gap={16} size={1} color="#e2e8f0" />
 
-            {/* Add Node Toolbar */}
+            {/* Add Node Toolbar - icon-only, expands on hover */}
             <Panel position="top-left">
-              <Paper elevation={2} sx={{ p: 0.75, borderRadius: 2, display: 'flex', flexDirection: 'column', gap: 0.75, bgcolor: '#fff' }}>
-                <Tooltip title="Add Semester node" placement="right">
-                  <Button size="small" variant="outlined" startIcon={<SchoolIcon />}
+              <Paper
+                elevation={2}
+                onMouseEnter={() => setPanelExpanded(true)}
+                onMouseLeave={() => setPanelExpanded(false)}
+                sx={{
+                  p: 0.5,
+                  borderRadius: 2,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 0.5,
+                  bgcolor: '#ffffffee',
+                  backdropFilter: 'blur(4px)',
+                  overflow: 'hidden',
+                  transition: 'width 0.2s ease, min-width 0.2s ease',
+                  width: panelExpanded ? 150 : 34,
+                  minWidth: panelExpanded ? 150 : 34,
+                }}
+              >
+                <Tooltip title={panelExpanded ? '' : 'Add Semester'} placement="right" disableHoverListener={panelExpanded}>
+                  <Button size="small" variant="outlined"
                     onClick={(e) => openAddNodeMenu(e, 'semester')}
-                    sx={{ borderColor: '#1e3a5f', color: '#1e3a5f', fontSize: '0.75rem', textTransform: 'none', justifyContent: 'flex-start', '&:hover': { bgcolor: '#e8eaf6' } }}>
-                    + Semester
+                    sx={{ borderColor: '#1e3a5f', color: '#1e3a5f', fontSize: '0.7rem', textTransform: 'none', justifyContent: 'flex-start', minWidth: 0, px: 0.5, whiteSpace: 'nowrap', overflow: 'hidden', '&:hover': { bgcolor: '#e8eaf6' } }}>
+                    <SchoolIcon sx={{ fontSize: 16, flexShrink: 0 }} />
+                    {panelExpanded && <Box component="span" sx={{ ml: 0.5, overflow: 'hidden' }}>+ Semester</Box>}
                   </Button>
                 </Tooltip>
-                <Tooltip title="Add Class node" placement="right">
-                  <Button size="small" variant="outlined" startIcon={<GroupsIcon />}
+                <Tooltip title={panelExpanded ? '' : 'Add Class'} placement="right" disableHoverListener={panelExpanded}>
+                  <Button size="small" variant="outlined"
                     onClick={(e) => openAddNodeMenu(e, 'class')}
-                    sx={{ borderColor: '#7b1fa2', color: '#7b1fa2', fontSize: '0.75rem', textTransform: 'none', justifyContent: 'flex-start', '&:hover': { bgcolor: '#f3e5f5' } }}>
-                    + Class
+                    sx={{ borderColor: '#7b1fa2', color: '#7b1fa2', fontSize: '0.7rem', textTransform: 'none', justifyContent: 'flex-start', minWidth: 0, px: 0.5, whiteSpace: 'nowrap', overflow: 'hidden', '&:hover': { bgcolor: '#f3e5f5' } }}>
+                    <GroupsIcon sx={{ fontSize: 16, flexShrink: 0 }} />
+                    {panelExpanded && <Box component="span" sx={{ ml: 0.5, overflow: 'hidden' }}>+ Class</Box>}
                   </Button>
                 </Tooltip>
-                <Tooltip title="Add Subject node" placement="right">
-                  <Button size="small" variant="outlined" startIcon={<MenuBookIcon />}
+                <Tooltip title={panelExpanded ? '' : 'Add Subject'} placement="right" disableHoverListener={panelExpanded}>
+                  <Button size="small" variant="outlined"
                     onClick={(e) => openAddNodeMenu(e, 'subject')}
-                    sx={{ borderColor: '#1565c0', color: '#1565c0', fontSize: '0.75rem', textTransform: 'none', justifyContent: 'flex-start', '&:hover': { bgcolor: '#e3f2fd' } }}>
-                    + Subject
+                    sx={{ borderColor: '#1565c0', color: '#1565c0', fontSize: '0.7rem', textTransform: 'none', justifyContent: 'flex-start', minWidth: 0, px: 0.5, whiteSpace: 'nowrap', overflow: 'hidden', '&:hover': { bgcolor: '#e3f2fd' } }}>
+                    <MenuBookIcon sx={{ fontSize: 16, flexShrink: 0 }} />
+                    {panelExpanded && <Box component="span" sx={{ ml: 0.5, overflow: 'hidden' }}>+ Subject</Box>}
                   </Button>
                 </Tooltip>
-                <Tooltip title="Add Teacher node" placement="right">
-                  <Button size="small" variant="outlined" startIcon={<PersonIcon />}
+                <Tooltip title={panelExpanded ? '' : 'Add Teacher'} placement="right" disableHoverListener={panelExpanded}>
+                  <Button size="small" variant="outlined"
                     onClick={(e) => openAddNodeMenu(e, 'teacher')}
-                    sx={{ borderColor: '#2e7d32', color: '#2e7d32', fontSize: '0.75rem', textTransform: 'none', justifyContent: 'flex-start', '&:hover': { bgcolor: '#e8f5e9' } }}>
-                    + Teacher
+                    sx={{ borderColor: '#2e7d32', color: '#2e7d32', fontSize: '0.7rem', textTransform: 'none', justifyContent: 'flex-start', minWidth: 0, px: 0.5, whiteSpace: 'nowrap', overflow: 'hidden', '&:hover': { bgcolor: '#e8f5e9' } }}>
+                    <PersonIcon sx={{ fontSize: 16, flexShrink: 0 }} />
+                    {panelExpanded && <Box component="span" sx={{ ml: 0.5, overflow: 'hidden' }}>+ Teacher</Box>}
                   </Button>
                 </Tooltip>
                 <Divider sx={{ my: 0.25 }} />
-                <Tooltip title="Auto-generate theory routine from canvas assignments" placement="right">
+                <Tooltip title={panelExpanded ? '' : 'Generate Routine'} placement="right" disableHoverListener={panelExpanded}>
                   <span>
-                    <Button size="small" variant="contained" startIcon={generating ? <CircularProgress size={14} sx={{ color: '#fff' }} /> : <AutoFixHighIcon />}
+                    <Button size="small" variant="contained"
                       onClick={handleGenerateRoutine}
                       disabled={generating}
-                      sx={{ bgcolor: '#6366f1', fontSize: '0.75rem', textTransform: 'none', justifyContent: 'flex-start', '&:hover': { bgcolor: '#4f46e5' } }}>
-                      {generating ? 'Generating…' : 'Generate Routine'}
+                      sx={{ bgcolor: '#6366f1', fontSize: '0.7rem', textTransform: 'none', justifyContent: 'flex-start', minWidth: 0, px: 0.5, whiteSpace: 'nowrap', overflow: 'hidden', width: '100%', '&:hover': { bgcolor: '#4f46e5' } }}>
+                      {generating
+                        ? <CircularProgress size={14} sx={{ color: '#fff', flexShrink: 0 }} />
+                        : <AutoFixHighIcon sx={{ fontSize: 16, flexShrink: 0 }} />}
+                      {panelExpanded && <Box component="span" sx={{ ml: 0.5, overflow: 'hidden' }}>{generating ? 'Generating…' : 'Generate Routine'}</Box>}
                     </Button>
                   </span>
                 </Tooltip>

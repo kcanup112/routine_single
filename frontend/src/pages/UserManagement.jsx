@@ -169,7 +169,6 @@ export default function UserManagement() {
 
   const getRoleColor = (role) => {
     switch (role) {
-      case 'super_admin': return 'error';
       case 'admin': return 'warning';
       case 'viewer': return 'success';
       default: return 'default';
@@ -313,9 +312,6 @@ export default function UserManagement() {
               >
                 <MenuItem value="viewer">Viewer (Read Only)</MenuItem>
                 <MenuItem value="admin">Admin (Full Access)</MenuItem>
-                {currentUser?.role === 'super_admin' && (
-                  <MenuItem value="super_admin">Super Admin</MenuItem>
-                )}
               </Select>
             </FormControl>
             <FormControl fullWidth>

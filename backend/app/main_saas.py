@@ -1,14 +1,12 @@
 """
-Multi-tenant SaaS FastAPI Application
-Schema-based isolation for educational institutions
+Single-tenant FastAPI Application
+Routine Scheduler for a single educational institution
 """
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from app.core.database_saas import engine, Base
 from app.core.config_saas import settings
-from app.middleware.tenant import tenant_context_middleware
-from app.middleware.permissions import system_admin_permission_middleware
 import os
 import logging
 import traceback
@@ -16,46 +14,33 @@ import traceback
 logger = logging.getLogger(__name__)
 
 # Import all models BEFORE create_all so tables are registered with Base
-from app.models import models, models_saas  # noqa: F401
+from app.models import models  # noqa: F401
 
-# Initialize database (creates public schema tables if not exist)
-Base.metadata.create_all(bind=engine)
+# Initialize database (creates tables if not exist, skips existing ones)
+Base.metadata.create_all(bind=engine, checkfirst=True)
 
 app = FastAPI(
-    title="Routine Scheduler SaaS API",
-    description="Multi-tenant API for managing class schedules, teachers, and subjects",
-    version="2.0.0",
+    title="Routine Scheduler API",
+    description="API for managing class schedules, teachers, and subjects",
+    version="3.0.0",
     redirect_slashes=True
 )
 
-# CORS middleware - Allow localhost and any subdomain of localhost on any port (dev)
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
+        "http://localhost:5173",
         "http://localhost:8000",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:8000",
     ],
-    # Broad regex: http(s)://<anything>.localhost:<any port>
-    allow_origin_regex=r"https?://([a-z0-9-]+\.)?localhost(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
 )
-
-# Tenant context middleware (schema isolation)
-# Registered FIRST but executes SECOND (middleware execute in reverse order)
-@app.middleware("http")
-async def tenant_middleware(request: Request, call_next):
-    return await tenant_context_middleware(request, call_next)
-
-# System admin permission middleware (restrict to tenant management only)
-# Registered SECOND so executes FIRST (before tenant middleware)
-@app.middleware("http")
-async def permission_middleware(request: Request, call_next):
-    return await system_admin_permission_middleware(request, call_next)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -63,16 +48,13 @@ async def global_exception_handler(request: Request, exc: Exception):
     logger.error(traceback.format_exc())
     return JSONResponse(status_code=500, content={"detail": str(exc)})
 
-# Include existing API routers
+# Include API routers
 from app.api.routes import (
     departments, teachers, subjects, schedules, programmes, 
     semesters, semester_subjects, classes, rooms, days, 
-    periods, teacher_subjects, class_routines, auth, users, calendar, tenants, shifts, admin, finance
+    periods, teacher_subjects, class_routines, auth, users, calendar, shifts, finance
 )
 
-# Public routes (no tenant context required)
-app.include_router(tenants.router, prefix="/api/tenants", tags=["tenants"])
-app.include_router(admin.router, prefix="/api")
 app.include_router(auth.router, prefix="")
 app.include_router(users.router, prefix="/api")
 app.include_router(departments.router, prefix="")
@@ -95,8 +77,8 @@ app.include_router(finance.router, prefix="/finance", tags=["finance"])
 @app.get("/")
 def root():
     return {
-        "message": "Routine Scheduler SaaS API",
-        "version": "2.0.0",
+        "message": "Routine Scheduler API",
+        "version": "3.0.0",
         "environment": settings.ENVIRONMENT,
         "docs": "/docs"
     }
@@ -106,7 +88,7 @@ def health_check():
     """Health check endpoint for Docker and monitoring"""
     return {
         "status": "healthy",
-        "version": "2.0.0",
+        "version": "3.0.0",
         "database": "connected" if engine else "disconnected"
     }
 
@@ -126,12 +108,6 @@ async def not_found_handler(request: Request, exc):
 async def internal_error_handler(request: Request, exc):
     logger.error(f"Internal server error on {request.url.path}: {exc}")
     error_msg = str(exc) if settings.DEBUG else "Internal server error"
-    # Check for common database errors
-    if "does not exist" in str(exc) or "UndefinedTable" in str(exc):
-        return JSONResponse(
-            status_code=503,
-            content={"detail": "Tenant schema is not ready yet. Please try again shortly."}
-        )
     return JSONResponse(
         status_code=500,
         content={"detail": error_msg}

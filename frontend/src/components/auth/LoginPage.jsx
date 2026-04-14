@@ -32,12 +32,8 @@ export default function LoginPage() {
     try {
       const userData = await login(email, password);
       
-      // Redirect to tenant subdomain
-      const protocol = window.location.protocol;
-      const port = window.location.port ? `:${window.location.port}` : '';
-      const tenantUrl = `${protocol}//${userData.tenant_subdomain}.localhost${port}/dashboard`;
-      
-      window.location.href = tenantUrl;
+      // Redirect to dashboard
+      window.location.href = '/dashboard';
     } catch (err) {
       setError(err.response?.data?.detail || 'Login failed. Please check your credentials.');
     } finally {
@@ -127,24 +123,7 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <Box textAlign="center" mt={2}>
-            <Typography variant="body2" color="text.secondary">
-              Don't have an account?{' '}
-              <Typography
-                component="span"
-                variant="body2"
-                sx={{
-                  color: 'primary.main',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  '&:hover': { textDecoration: 'underline' },
-                }}
-                onClick={() => navigate('/signup')}
-              >
-                Create Organization
-              </Typography>
-            </Typography>
-          </Box>
+
         </Paper>
       </Container>
     </Box>

@@ -1,6 +1,5 @@
 """
 Redis caching layer for frequently accessed data.
-Caches tenant lookups (per-request) and user lookups (per-request auth).
 Falls back to no-cache gracefully if Redis is unavailable.
 """
 import json
@@ -84,29 +83,6 @@ def cache_delete_pattern(pattern: str):
             r.delete(*keys)
     except Exception:
         pass
-
-
-# ── Tenant cache helpers ──
-
-def get_cached_tenant(subdomain: str) -> Optional[dict]:
-    """Get tenant dict from cache by subdomain."""
-    raw = cache_get(f"tenant:{subdomain}")
-    if raw:
-        try:
-            return json.loads(raw)
-        except (json.JSONDecodeError, TypeError):
-            pass
-    return None
-
-
-def set_cached_tenant(subdomain: str, tenant_dict: dict, ttl: int = 3600):
-    """Cache a tenant dict by subdomain (1 hour default)."""
-    cache_set(f"tenant:{subdomain}", json.dumps(tenant_dict), ttl)
-
-
-def invalidate_tenant_cache(subdomain: str):
-    """Invalidate cached tenant on update."""
-    cache_delete(f"tenant:{subdomain}")
 
 
 # ── User cache helpers ──
