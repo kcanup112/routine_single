@@ -25,6 +25,8 @@ import {
   IconButton,
   Snackbar,
   Alert,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material'
 import { 
   Save as SaveIcon,
@@ -64,6 +66,8 @@ export default function ClassRoutine() {
   const { isAdmin, isAuthenticated, isSchool } = useAuth()
   const canEdit = isAuthenticated && isAdmin()
   const school = isSchool()
+  const theme = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
   const [tabValue, setTabValue] = useState(0)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const fullscreenRef = React.useRef(null)
@@ -2809,8 +2813,8 @@ export default function ClassRoutine() {
         )
       }
       return (
-        <Typography variant="caption" color="text.secondary">
-          Click to assign
+        <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
+          {isMobile ? 'Tap to assign' : 'Click to assign'}
         </Typography>
       )
     }
@@ -3027,6 +3031,177 @@ export default function ClassRoutine() {
     return !cellData || !cellData.isContinuation
   }
 
+  // Mobile card view: renders routine as a list of day cards with period rows
+  // mobileShowAllDays: false = only today, true = all days
+  const [mobileShowAllDays, setMobileShowAllDays] = useState(false)
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false)
+
+  // Determine today's day name to match against the days array
+  const todayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][new Date().getDay()]
+
+  const renderMobileRoutine = () => {
+    const visibleDays = mobileShowAllDays
+      ? days
+      : days.filter(d => d.name.toLowerCase() === todayName.toLowerCase())
+
+    const todayInDays = days.some(d => d.name.toLowerCase() === todayName.toLowerCase())
+
+    return (
+      <Box sx={{ mt: 1 }}>
+        {/* Day filter toggle */}
+        <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+          <Button
+            size="small"
+            variant={!mobileShowAllDays ? 'contained' : 'outlined'}
+            onClick={() => setMobileShowAllDays(false)}
+            sx={{
+              flex: 1,
+              borderRadius: '20px',
+              textTransform: 'none',
+              fontWeight: 600,
+              fontSize: '0.8rem',
+              ...(mobileShowAllDays ? {
+                borderColor: '#2d6a6f',
+                color: '#2d6a6f',
+              } : {
+                bgcolor: '#2d6a6f',
+                color: 'white',
+                '&:hover': { bgcolor: '#235558' },
+              }),
+            }}
+          >
+            Today ({todayName})
+          </Button>
+          <Button
+            size="small"
+            variant={mobileShowAllDays ? 'contained' : 'outlined'}
+            onClick={() => setMobileShowAllDays(true)}
+            sx={{
+              flex: 1,
+              borderRadius: '20px',
+              textTransform: 'none',
+              fontWeight: 600,
+              fontSize: '0.8rem',
+              ...(mobileShowAllDays ? {
+                bgcolor: '#2d6a6f',
+                color: 'white',
+                '&:hover': { bgcolor: '#235558' },
+              } : {
+                borderColor: '#2d6a6f',
+                color: '#2d6a6f',
+              }),
+            }}
+          >
+            All Days
+          </Button>
+        </Box>
+
+        {/* No schedule message for today */}
+        {!mobileShowAllDays && !todayInDays && (
+          <Paper elevation={0} sx={{ p: 3, textAlign: 'center', border: '1px solid #e8edf2', borderRadius: '12px' }}>
+            <Typography variant="body2" sx={{ color: '#8896a4' }}>
+              No schedule configured for {todayName}.
+            </Typography>
+          </Paper>
+        )}
+
+        {visibleDays.map((day) => {
+          const isToday = day.name.toLowerCase() === todayName.toLowerCase()
+          return (
+            <Paper
+              key={day.id}
+              elevation={0}
+              sx={{ mb: 2, border: `1px solid ${isToday ? '#2d6a6f' : '#e8edf2'}`, borderRadius: '12px', overflow: 'hidden' }}
+            >
+              {/* Day header */}
+              <Box sx={{
+                bgcolor: isToday ? '#2d6a6f' : '#f8fafc',
+                color: isToday ? 'white' : '#1a2332',
+                px: 2,
+                py: 1.25,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+              }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700, letterSpacing: 0.5 }}>
+                  {day.name}
+                </Typography>
+                {isToday && (
+                  <Box sx={{
+                    bgcolor: 'rgba(255,255,255,0.25)',
+                    color: 'white',
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    px: 1,
+                    py: 0.2,
+                    borderRadius: '10px',
+                    letterSpacing: 0.5,
+                  }}>
+                    TODAY
+                  </Box>
+                )}
+              </Box>
+
+              {/* Period rows */}
+              {periods.map((period) => {
+                if (!shouldRenderCell(day.id, period.id)) return null
+
+                const cellKey = `${day.id}-${period.id}`
+                const cellData = getCellData(day.id, period.id)
+                const hasContent = cellData && !cellData.isContinuation
+                const isDuplicate = hasDuplicateAssignment(day.id, period.id)
+                const isBreakPeriod = period.type === 'break' || period.is_teaching_period === false
+                const colSpan = getCellColSpan(day.id, period.id)
+
+                return (
+                  <Box
+                    key={cellKey}
+                    onClick={() => isAdmin() && handleOpenAssignment(day.id, period.id, day.name, period.order)}
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      borderBottom: '1px solid #e8edf2',
+                      p: 1.5,
+                      cursor: isAdmin() ? 'pointer' : 'default',
+                      bgcolor: isDuplicate ? '#FFCDD2' :
+                               (hasContent && cellData?.subject_id === 'BREAK') ? '#FFF3E0' :
+                               isBreakPeriod ? '#FFF3E0' :
+                               (hasContent && cellData?.is_lab) ? '#E3F2FD' : 'inherit',
+                      '&:last-child': { borderBottom: 'none' },
+                      '&:active': isAdmin() ? { bgcolor: 'action.selected' } : {},
+                      transition: 'background-color 0.15s',
+                      minHeight: 56,
+                    }}
+                  >
+                    {/* Time column */}
+                    <Box sx={{ minWidth: 72, mr: 1.5, pt: 0.25 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#2d6a6f', display: 'block', lineHeight: 1.4 }}>
+                        {period.start_time?.substring(0, 5)}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: '#8896a4', display: 'block', lineHeight: 1.4 }}>
+                        {period.end_time?.substring(0, 5)}
+                      </Typography>
+                      {colSpan > 1 && (
+                        <Typography variant="caption" sx={{ color: '#bbb', display: 'block', fontSize: '0.6rem' }}>
+                          ×{colSpan} periods
+                        </Typography>
+                      )}
+                    </Box>
+
+                    {/* Content column */}
+                    <Box sx={{ flex: 1, position: 'relative' }}>
+                      {renderCell(day.id, period.id)}
+                    </Box>
+                  </Box>
+                )
+              })}
+            </Paper>
+          )
+        })}
+      </Box>
+    )
+  }
+
   const getProgrammeName = () => {
     if (school) {
       const dept = departments.find(d => d.id === formData.department_id)
@@ -3065,14 +3240,17 @@ export default function ClassRoutine() {
           <Tabs 
             value={tabValue} 
             onChange={(e, newValue) => setTabValue(newValue)}
+            variant={isMobile ? 'fullWidth' : 'standard'}
             sx={{
               bgcolor: '#f8fafc',
               borderBottom: '1px solid #e8edf2',
               '& .MuiTab-root': {
                 fontWeight: 600,
-                fontSize: '0.95rem',
+                fontSize: { xs: '0.8rem', sm: '0.95rem' },
                 textTransform: 'none',
                 color: '#8896a4',
+                minWidth: { xs: 'auto', sm: 90 },
+                px: { xs: 1, sm: 2 },
               },
               '& .Mui-selected': {
                 color: '#2d6a6f',
@@ -3092,14 +3270,60 @@ export default function ClassRoutine() {
 
           <TabPanel value={tabValue} index={0}>
             {/* Compact Form Section */}
+
+            {/* Mobile: collapsible filter toggle */}
+            {isMobile && (
+              <Box
+                onClick={() => setMobileFilterOpen(o => !o)}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  mb: mobileFilterOpen ? 1 : 2,
+                  px: 2,
+                  py: 1.25,
+                  bgcolor: '#f8fafc',
+                  border: '1px solid #e8edf2',
+                  borderRadius: mobileFilterOpen ? '12px 12px 0 0' : '12px',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {/* filter icon */}
+                  <Box component="span" sx={{ fontSize: '1rem', lineHeight: 1 }}>⚙️</Box>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: '#1a2332' }}>
+                    {formData.class_id
+                      ? `${getProgrammeName()} ${getSemesterName()} ${formData.section}`
+                      : 'Select Class'}
+                  </Typography>
+                </Box>
+                <Box
+                  component="span"
+                  sx={{
+                    fontSize: '0.75rem',
+                    color: '#2d6a6f',
+                    fontWeight: 700,
+                    transition: 'transform 0.2s',
+                    display: 'inline-block',
+                    transform: mobileFilterOpen ? 'rotate(180deg)' : 'none',
+                  }}
+                >
+                  ▼
+                </Box>
+              </Box>
+            )}
+
             <Paper 
               elevation={0}
               sx={{ 
                 p: { xs: 2, sm: 3 }, 
                 mb: 3, 
                 bgcolor: '#f8fafc',
-                borderRadius: '12px',
+                borderRadius: isMobile ? '0 0 12px 12px' : '12px',
                 border: '1px solid #e8edf2',
+                borderTop: isMobile ? 'none' : '1px solid #e8edf2',
+                display: isMobile && !mobileFilterOpen ? 'none' : 'block',
               }}
             >
               <Grid container spacing={{ xs: 1.5, sm: 2 }} alignItems="center">
@@ -3205,6 +3429,8 @@ export default function ClassRoutine() {
                         section: selectedClass?.section || '',
                         room_no: roomNo, // Set room_no from database
                       })
+                      // Auto-collapse filter panel on mobile once class is chosen
+                      if (isMobile && e.target.value) setMobileFilterOpen(false)
                     }}
                     disabled={!formData.semester_id}
                     required
@@ -3308,7 +3534,7 @@ export default function ClassRoutine() {
                   flexWrap: 'wrap',
                   gap: 1,
                 }}>
-                  <Typography variant="h6" sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}>
+                  <Typography variant="h6" sx={{ fontSize: { xs: '0.875rem', sm: '1.25rem' }, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: { xs: 'nowrap', sm: 'normal' }, maxWidth: { xs: 'calc(100vw - 120px)', sm: 'none' } }}>
                     ROUTINE for Class : {getProgrammeName()} {getSemesterName()} {formData.section}
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
@@ -3334,6 +3560,12 @@ export default function ClassRoutine() {
                     <Typography>Loading routine data...</Typography>
                   </Box>
                 ) : (
+                  isMobile ? (
+                    /* Mobile day-card view */
+                    <Box sx={{ p: 1.5, overflow: 'auto', maxHeight: 'calc(100vh - 200px)' }}>
+                      {renderMobileRoutine()}
+                    </Box>
+                  ) : (
                   <TableContainer 
                     component={Paper} 
                     elevation={0}
@@ -3447,6 +3679,7 @@ export default function ClassRoutine() {
                     </TableBody>
                   </Table>
                 </TableContainer>
+                  )
                 )}
 
                 <Box sx={{ mt: 3, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
@@ -3589,9 +3822,15 @@ export default function ClassRoutine() {
           onClose={handleCloseAssignment}
           maxWidth="sm"
           fullWidth
+          fullScreen={isMobile}
         >
-          <DialogTitle>
-            Assign Subject - {assignmentDialog.dayName} (Period {assignmentDialog.periodOrder})
+          <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pr: 1 }}>
+            <span>Assign Subject — {assignmentDialog.dayName} (Period {assignmentDialog.periodOrder})</span>
+            {isMobile && (
+              <IconButton onClick={handleCloseAssignment} size="small" edge="end" aria-label="close">
+                <span style={{ fontSize: '1.1rem', lineHeight: 1 }}>✕</span>
+              </IconButton>
+            )}
           </DialogTitle>
           <DialogContent>
             <Box sx={{ mt: 2 }}>

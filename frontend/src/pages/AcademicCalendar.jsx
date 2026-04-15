@@ -396,7 +396,7 @@ export default function AcademicCalendar() {
               <Grid item xs={12/7} key={idx}>
                 <Box
                   sx={{
-                    minHeight: 45,
+                    minHeight: 65,
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
@@ -442,7 +442,7 @@ export default function AcademicCalendar() {
                   <Typography 
                     variant="body2" 
                     fontWeight={isToday || isSelected ? 'bold' : 'normal'}
-                    sx={{ fontSize: '0.875rem', lineHeight: 1.2 }}
+                    sx={{ fontSize: '1.05rem', lineHeight: 1.2 }}
                   >
                     {calendarType === 'bs' && dayBS
                       ? englishToNepaliNumber(dayBS.date)
@@ -453,7 +453,7 @@ export default function AcademicCalendar() {
                     <Typography 
                       variant="caption" 
                       sx={{ 
-                        fontSize: '0.6rem', 
+                        fontSize: '0.72rem', 
                         lineHeight: 1,
                         opacity: 0.8,
                         color: isToday ? 'white' : 'text.secondary'
@@ -695,7 +695,7 @@ export default function AcademicCalendar() {
         {/* Main Content - Split Layout */}
         <Grid container spacing={3}>
           {/* Left Sidebar - Mini Calendar */}
-          <Grid item xs={12} md={4} lg={3}>
+          <Grid item xs={12} md={6} lg={6}>
             <Paper 
               sx={{ 
                 p: 3, 
@@ -816,7 +816,7 @@ export default function AcademicCalendar() {
           </Grid>
 
           {/* Right Content - Event Lists */}
-          <Grid item xs={12} md={8} lg={9}>
+          <Grid item xs={12} md={6} lg={6}>
             {/* Selected Date Events */}
             {selectedDate && (
               <Paper 
@@ -907,43 +907,62 @@ export default function AcademicCalendar() {
             {/* Upcoming Events */}
             <Paper 
               sx={{ 
-                p: 3, 
+                p: 1.5, 
                 borderRadius: 3,
                 boxShadow: 2,
                 border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
               }}
             >
-              <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
+              <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1, px: 0.5 }}>
                 Upcoming Events
               </Typography>
               
               {getUpcomingEvents().length > 0 ? (
-                getUpcomingEvents().map(event => renderEventCard(event))
+                getUpcomingEvents().map(event => {
+                  const ec = eventTypeOptions.find(o => o.value === event.event_type)
+                  const color = ec?.color || '#1976d2'
+                  return (
+                    <Box
+                      key={event.id}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        px: 1,
+                        py: 0.75,
+                        mb: 0.5,
+                        borderRadius: 1.5,
+                        borderLeft: `3px solid ${color}`,
+                        bgcolor: alpha(color, 0.05),
+                        cursor: canEdit ? 'pointer' : 'default',
+                        '&:hover': { bgcolor: alpha(color, 0.1) },
+                      }}
+                      onClick={() => canEdit && handleEditEvent(event)}
+                    >
+                      <Typography sx={{ fontSize: '0.95rem', lineHeight: 1 }}>{ec?.icon}</Typography>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography variant="caption" fontWeight={600} noWrap sx={{ display: 'block', fontSize: '0.78rem' }}>
+                          {event.title}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                          {event.start_date}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  )
+                })
               ) : (
                 <Box 
                   sx={{ 
-                    py: 4, 
+                    py: 2, 
                     textAlign: 'center',
                     backgroundColor: alpha(theme.palette.primary.main, 0.02),
                     borderRadius: 2,
                   }}
                 >
-                  <Typography variant="body1" color="text.secondary">
+                  <Typography variant="caption" color="text.secondary">
                     No upcoming events
                   </Typography>
-                  {canEdit && (
-                    <Button
-                      variant="contained"
-                      startIcon={<AddIcon />}
-                      onClick={() => {
-                        resetForm()
-                        setOpenDialog(true)
-                      }}
-                      sx={{ mt: 2, borderRadius: 2, textTransform: 'none' }}
-                    >
-                      Create Event
-                    </Button>
-                  )}
                 </Box>
               )}
             </Paper>

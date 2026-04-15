@@ -136,17 +136,21 @@ export default function LandingPage() {
             startIcon={<LoginIcon />}
             onClick={() => navigate('/login')}
             sx={{
-              bgcolor: '#f59e0b',
-              color: '#1a1a2e',
+              background: 'linear-gradient(90deg, #f472b6 0%, #a78bfa 50%, #60a5fa 100%)',
+              color: 'white',
               fontWeight: 700,
               px: 5,
               py: 1.5,
               fontSize: '1rem',
-              borderRadius: 2,
-              boxShadow: '0 4px 20px rgba(245,158,11,0.4)',
+              borderRadius: '50px',
+              boxShadow: '0 6px 24px rgba(167,139,250,0.35)',
+              textTransform: 'none',
+              transition: 'opacity 0.2s, transform 0.2s',
               '&:hover': {
-                bgcolor: '#d97706',
-                boxShadow: '0 6px 24px rgba(245,158,11,0.5)',
+                opacity: 0.92,
+                transform: 'translateY(-1px)',
+                background: 'linear-gradient(90deg, #f472b6 0%, #a78bfa 50%, #60a5fa 100%)',
+                boxShadow: '0 8px 28px rgba(167,139,250,0.45)',
               },
             }}
           >
