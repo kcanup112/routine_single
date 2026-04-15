@@ -1,6 +1,6 @@
 ﻿import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import axios from 'axios';
+import { useAuth } from '../contexts/AuthContext';
 import {
   Container,
   Paper,
@@ -23,6 +23,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { login } = useAuth();
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -30,19 +31,9 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '' : 'http://localhost:8000');
-      const response = await axios.post(`${API_URL}/auth/login`, {
-        email,
-        password
-      });
+      const userData = await login(email, password);
 
-      const { access_token, user } = response.data;
-
-      // Store token and user info
-      localStorage.setItem('token', access_token);
-      localStorage.setItem('user', JSON.stringify(user));
-
-      // Redirect to dashboard
+      // Redirect based on role
       const redirect = searchParams.get('redirect') || '/dashboard';
       navigate(redirect);
     } catch (err) {
