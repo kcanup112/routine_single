@@ -1,11 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Typography, Grid, Card, CardContent, Box, Skeleton, IconButton, Chip, Tooltip, Avatar } from '@mui/material'
+import { Typography, Grid, Box, IconButton, Chip, Tooltip, Avatar } from '@mui/material'
 import {
-  Business as DepartmentIcon,
   Person as TeacherIcon,
-  MenuBook as SubjectIcon,
-  Class as ClassIcon,
   ChevronLeft,
   ChevronRight,
   Schedule as ScheduleIcon,
@@ -15,7 +12,7 @@ import {
   AccountTree as ProgrammeIcon,
   Layers as SemesterIcon,
 } from '@mui/icons-material'
-import { departmentService, teacherService, subjectService, classService, calendarService } from '../services'
+import { calendarService } from '../services'
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, startOfWeek, endOfWeek } from 'date-fns'
 import { adToBS, formatBSDate, englishToNepaliNumber } from '../utils/nepaliCalendar'
 import { useAuth } from '../contexts/AuthContext'
@@ -35,86 +32,17 @@ const eventTypeOptions = [
   { value: 'exhibition', label: 'Exhibition', color: '#a855f7' },
 ]
 
-const StatCard = ({ title, value, icon, color, trend, loading, onClick }) => (
-  <Card
-    elevation={0}
-    onClick={onClick}
-    sx={{
-      background: '#ffffff',
-      border: '1px solid #e8edf2',
-      borderRadius: '16px',
-      cursor: onClick ? 'pointer' : 'default',
-      transition: 'all 0.25s ease',
-      '&:hover': onClick ? {
-        transform: 'translateY(-3px)',
-        boxShadow: `0 12px 28px -8px ${color}30`,
-        borderColor: `${color}60`,
-      } : {},
-    }}
-  >
-    <CardContent sx={{ p: '20px !important' }}>
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 1.5 }}>
-        <Typography variant="caption" sx={{ color: '#8896a4', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.6px', fontSize: '0.7rem' }}>
-          {title}
-        </Typography>
-        <Box sx={{ width: 36, height: 36, borderRadius: '10px', background: `${color}18`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {icon}
-        </Box>
-      </Box>
-      {loading ? (
-        <Skeleton variant="text" width={50} height={42} />
-      ) : (
-        <Typography variant="h4" sx={{ fontWeight: 700, color: '#1a2332', fontSize: '2rem', lineHeight: 1 }}>
-          {value}
-        </Typography>
-      )}
-      {trend && (
-        <Typography variant="caption" sx={{ color: '#52c41a', fontWeight: 600, fontSize: '0.7rem', mt: 0.5, display: 'block' }}>
-          {trend}
-        </Typography>
-      )}
-    </CardContent>
-  </Card>
-)
-
 export default function Dashboard() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const [stats, setStats] = useState({ departments: 0, teachers: 0, subjects: 0, classes: 0 })
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [events, setEvents] = useState([])
   const [selectedDate, setSelectedDate] = useState(new Date())
 
   useEffect(() => {
-    loadStats()
-  }, [])
-
-  useEffect(() => {
     fetchCalendarEvents()
   }, [currentMonth])
-
-  const loadStats = async () => {
-    setLoading(true)
-    try {
-      const [deptRes, teacherRes, subjectRes, classRes] = await Promise.all([
-        departmentService.getAll(),
-        teacherService.getAll(),
-        subjectService.getAll(),
-        classService.getAll(),
-      ])
-      setStats({
-        departments: Array.isArray(deptRes.data) ? deptRes.data.length : 0,
-        teachers: Array.isArray(teacherRes.data) ? teacherRes.data.length : 0,
-        subjects: Array.isArray(subjectRes.data) ? subjectRes.data.length : 0,
-        classes: Array.isArray(classRes.data) ? classRes.data.length : 0,
-      })
-    } catch (error) {
-      console.error('Error loading stats:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const parseLocalDate = (dateStr) => {
     if (!dateStr) return null
@@ -346,22 +274,6 @@ export default function Dashboard() {
             Class Schedule &amp; Academic Management
           </Typography>
         </Box>
-
-        {/* ── Stats row ── */}
-        <Grid container spacing={2} sx={{ mb: 3 }}>
-          <Grid item xs={6} sm={3}>
-            <StatCard title="Departments" value={stats.departments} icon={<DepartmentIcon sx={{ fontSize: 18, color: '#6366f1' }} />} color="#6366f1" loading={loading} onClick={() => navigate('/dashboard/departments')} />
-          </Grid>
-          <Grid item xs={6} sm={3}>
-            <StatCard title="Teachers" value={stats.teachers} icon={<TeacherIcon sx={{ fontSize: 18, color: '#ec4899' }} />} color="#ec4899" loading={loading} onClick={() => navigate('/dashboard/teachers')} />
-          </Grid>
-          <Grid item xs={6} sm={3}>
-            <StatCard title="Subjects" value={stats.subjects} icon={<SubjectIcon sx={{ fontSize: 18, color: '#06b6d4' }} />} color="#06b6d4" loading={loading} onClick={() => navigate('/dashboard/subjects')} />
-          </Grid>
-          <Grid item xs={6} sm={3}>
-            <StatCard title="Classes" value={stats.classes} icon={<ClassIcon sx={{ fontSize: 18, color: '#10b981' }} />} color="#10b981" loading={loading} onClick={() => navigate('/dashboard/classes')} />
-          </Grid>
-        </Grid>
 
         {/* ── KEC Banner ── */}
         <Box
