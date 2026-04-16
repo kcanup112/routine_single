@@ -32,14 +32,14 @@ def get_default_teaching_periods(db: Session = Depends(get_db), current_user: Us
     """Get teaching periods for the default active shift."""
     return PeriodService.get_default_teaching_periods(db)
 
-@router.get("/{period_id}", response_model=schemas.Period)
+@router.get("/{period_id}/", response_model=schemas.Period)
 def get_period(period_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_read_access)):
     period = PeriodService.get_by_id(db, period_id)
     if not period:
         raise HTTPException(status_code=404, detail="Period not found")
     return period
 
-@router.put("/{period_id}", response_model=schemas.Period)
+@router.put("/{period_id}/", response_model=schemas.Period)
 def update_period(period_id: int, period: schemas.PeriodCreate, db: Session = Depends(get_db), current_user: User = Depends(require_write_access)):
     updated = PeriodService.update(db, period_id, period)
     if not updated:

@@ -233,16 +233,19 @@ class ClassRoutine(Base):
     class_id = Column(Integer, ForeignKey("classes.id", ondelete="CASCADE"), nullable=False)
     day_id = Column(Integer, ForeignKey("days.id", ondelete="CASCADE"), nullable=False)
     period_id = Column(Integer, ForeignKey("periods.id", ondelete="CASCADE"), nullable=False)
-    subject_id = Column(Integer, ForeignKey("subjects.id", ondelete="CASCADE"), nullable=True)  # Changed from semester_subject_id
+    semester_subject_id = Column(Integer, ForeignKey("semester_subjects.id", ondelete="CASCADE"), nullable=True)
     teacher_id = Column(Integer, ForeignKey("teachers.id", ondelete="SET NULL"), nullable=True)
-    room_no = Column(String(50), nullable=True)  # Changed from room_id to match actual database
+    room_id = Column(Integer, ForeignKey("rooms.id", ondelete="SET NULL"), nullable=True)
+    is_active = Column(Boolean, default=True)
+    notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    deleted_at = Column(DateTime, nullable=True)
     
     class_ = relationship("Class", back_populates="class_routines")
     day = relationship("Day", back_populates="class_routines")
     period = relationship("Period", back_populates="class_routines")
-    subject = relationship("Subject")  # Changed from semester_subject
+    semester_subject = relationship("SemesterSubject")
     teacher = relationship("Teacher")
 
 class Room(Base):
@@ -275,10 +278,10 @@ class ClassRoutineEntry(Base):
     )
     
     id = Column(Integer, primary_key=True, index=True)
-    class_id = Column(Integer, ForeignKey("classes.id"))
-    day_id = Column(Integer, ForeignKey("days.id"))
-    period_id = Column(Integer, ForeignKey("periods.id"))
-    subject_id = Column(Integer, ForeignKey("subjects.id"))
+    class_id = Column(Integer, ForeignKey("classes.id", ondelete="CASCADE"))
+    day_id = Column(Integer, ForeignKey("days.id", ondelete="CASCADE"))
+    period_id = Column(Integer, ForeignKey("periods.id", ondelete="CASCADE"))
+    subject_id = Column(Integer, ForeignKey("subjects.id", ondelete="CASCADE"))
     is_lab = Column(Boolean, default=False)
     is_half_lab = Column(Boolean, default=False)
     num_periods = Column(Integer, default=1)

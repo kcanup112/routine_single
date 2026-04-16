@@ -305,10 +305,10 @@ const Finance = () => {
                 <TableRow sx={{ 
                   background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
                 }}>
-                  <TableCell sx={{ color: 'white', fontWeight: 700, fontSize: '0.95rem' }}>
+                  <TableCell sx={{ color: '#111111', fontWeight: 700, fontSize: '0.95rem' }}>
                     Position
                   </TableCell>
-                  <TableCell sx={{ color: 'white', fontWeight: 700, fontSize: '0.95rem' }}>
+                  <TableCell sx={{ color: '#111111', fontWeight: 700, fontSize: '0.95rem' }}>
                     Rate (NPR per period)
                   </TableCell>
                 </TableRow>

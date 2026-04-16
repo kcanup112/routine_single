@@ -23,7 +23,7 @@ app = FastAPI(
     title="Routine Scheduler API",
     description="API for managing class schedules, teachers, and subjects",
     version="3.0.0",
-    redirect_slashes=True
+    redirect_slashes=False
 )
 
 # CORS middleware

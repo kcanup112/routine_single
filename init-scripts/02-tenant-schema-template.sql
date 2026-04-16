@@ -121,8 +121,11 @@ CREATE TABLE IF NOT EXISTS semesters (
     id SERIAL PRIMARY KEY,
     programme_id INTEGER NOT NULL REFERENCES programmes(id) ON DELETE CASCADE,
     name VARCHAR(100) NOT NULL,
-    semester_number INTEGER,
-    description TEXT,
+    semester_number INTEGER NOT NULL,
+    academic_year VARCHAR(20),
+    start_date DATE,
+    end_date DATE,
+    is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP
@@ -133,9 +136,11 @@ CREATE TABLE IF NOT EXISTS classes (
     id SERIAL PRIMARY KEY,
     semester_id INTEGER NOT NULL REFERENCES semesters(id) ON DELETE CASCADE,
     shift_id INTEGER REFERENCES shifts(id) ON DELETE SET NULL,
+    department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
     
     name VARCHAR(200) NOT NULL,
     section VARCHAR(50),
+    room_no VARCHAR(50),
     
     -- Capacity
     student_capacity INTEGER DEFAULT 60,
@@ -146,6 +151,7 @@ CREATE TABLE IF NOT EXISTS classes (
     
     -- Academic year
     academic_year VARCHAR(20),
+    effective_date DATE,
     
     -- Metadata
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -163,6 +169,7 @@ CREATE TABLE IF NOT EXISTS teachers (
     user_id INTEGER,  -- Links to public.users for login access
     
     name VARCHAR(200) NOT NULL,
+    abbreviation VARCHAR(50),
     email VARCHAR(255) UNIQUE,
     phone VARCHAR(20),
     
@@ -170,6 +177,7 @@ CREATE TABLE IF NOT EXISTS teachers (
     employee_id VARCHAR(50) UNIQUE,
     designation VARCHAR(100),
     qualification TEXT,
+    employment_type VARCHAR(20) DEFAULT 'full_time',
     
     -- Availability
     max_periods_per_week INTEGER DEFAULT 30,
@@ -197,6 +205,7 @@ CREATE TABLE IF NOT EXISTS subjects (
     
     -- Subject info
     credit_hours INTEGER,
+    is_lab BOOLEAN DEFAULT FALSE,
     type VARCHAR(50),
     description TEXT,
     
@@ -249,19 +258,23 @@ CREATE TABLE IF NOT EXISTS teacher_subjects (
 -- Rooms
 CREATE TABLE IF NOT EXISTS rooms (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL UNIQUE,
-    room_number VARCHAR(50),
-    building VARCHAR(100),
+    room_number VARCHAR(50) UNIQUE NOT NULL,
+    name VARCHAR(200),
+    building VARCHAR(200),
+    description TEXT,
+    floor VARCHAR(50),
     
     -- Capacity
     capacity INTEGER,
     
     -- Type
     type VARCHAR(50),
+    room_type VARCHAR(50),
     facilities TEXT[],
     
     -- Status
     is_active BOOLEAN DEFAULT TRUE,
+    is_available BOOLEAN DEFAULT TRUE,
     
     -- Metadata
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -307,6 +320,50 @@ CREATE TABLE IF NOT EXISTS class_routines (
 CREATE INDEX idx_class_routines_class ON class_routines(class_id);
 CREATE INDEX idx_class_routines_teacher ON class_routines(teacher_id);
 CREATE INDEX idx_class_routines_day ON class_routines(day_id);
+
+-- Class Routine Entries (Detailed per-period schedule with multi-teacher support)
+CREATE TABLE IF NOT EXISTS class_routine_entries (
+    id SERIAL PRIMARY KEY,
+    class_id INTEGER REFERENCES classes(id) ON DELETE CASCADE,
+    day_id INTEGER REFERENCES days(id) ON DELETE CASCADE,
+    period_id INTEGER REFERENCES periods(id) ON DELETE CASCADE,
+    subject_id INTEGER REFERENCES subjects(id) ON DELETE CASCADE,
+
+    -- Lab settings
+    is_lab BOOLEAN DEFAULT FALSE,
+    is_half_lab BOOLEAN DEFAULT FALSE,
+    num_periods INTEGER DEFAULT 1,
+
+    -- Teacher assignments
+    lead_teacher_id INTEGER REFERENCES teachers(id) ON DELETE SET NULL,
+    assist_teacher_1_id INTEGER REFERENCES teachers(id) ON DELETE SET NULL,
+    assist_teacher_2_id INTEGER REFERENCES teachers(id) ON DELETE SET NULL,
+    assist_teacher_3_id INTEGER REFERENCES teachers(id) ON DELETE SET NULL,
+
+    -- Lab grouping
+    "group" VARCHAR,
+    lab_room VARCHAR,
+    lab_group_id VARCHAR
+);
+
+CREATE INDEX IF NOT EXISTS ix_cre_class_day_period ON class_routine_entries(class_id, day_id, period_id);
+CREATE INDEX IF NOT EXISTS ix_cre_teacher_day ON class_routine_entries(lead_teacher_id, day_id);
+CREATE INDEX IF NOT EXISTS ix_cre_class_subject ON class_routine_entries(class_id, subject_id);
+
+-- Position Rates (for finance/workload calculations)
+CREATE TABLE IF NOT EXISTS position_rates (
+    id SERIAL PRIMARY KEY,
+    position VARCHAR UNIQUE NOT NULL,
+    rate FLOAT NOT NULL
+);
+
+-- Teacher Effective Loads
+CREATE TABLE IF NOT EXISTS teacher_effective_loads (
+    id SERIAL PRIMARY KEY,
+    teacher_id INTEGER UNIQUE NOT NULL REFERENCES teachers(id) ON DELETE CASCADE,
+    effective_load FLOAT NOT NULL DEFAULT 20.0,
+    position VARCHAR
+);
 
 -- Academic Calendar Events
 CREATE TABLE IF NOT EXISTS calendar_events (

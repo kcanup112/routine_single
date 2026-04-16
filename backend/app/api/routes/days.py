@@ -17,14 +17,14 @@ def create_day(day: schemas.DayCreate, db: Session = Depends(get_db), current_us
 def get_days(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(require_read_access)):
     return DayService.get_all(db, skip, limit)
 
-@router.get("/{day_id}", response_model=schemas.Day)
+@router.get("/{day_id}/", response_model=schemas.Day)
 def get_day(day_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_read_access)):
     day = DayService.get_by_id(db, day_id)
     if not day:
         raise HTTPException(status_code=404, detail="Day not found")
     return day
 
-@router.put("/{day_id}", response_model=schemas.Day)
+@router.put("/{day_id}/", response_model=schemas.Day)
 def update_day(day_id: int, day: schemas.DayBase, db: Session = Depends(get_db), current_user: User = Depends(require_write_access)):
     updated = DayService.update(db, day_id, day)
     if not updated:

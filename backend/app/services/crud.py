@@ -423,6 +423,8 @@ class DayService:
     def delete(db: Session, day_id: int):
         db_day = db.query(models.Day).filter(models.Day.id == day_id).first()
         if db_day:
+            db.query(models.ClassRoutineEntry).filter(models.ClassRoutineEntry.day_id == day_id).delete()
+            db.execute(text("DELETE FROM class_routines WHERE day_id = :day_id"), {"day_id": day_id})
             db.delete(db_day)
             db.commit()
         return db_day
@@ -526,9 +528,10 @@ class ShiftService:
     
     @staticmethod
     def create(db: Session, shift: schemas.ShiftCreate):
-        """Create shift and auto-generate periods"""
+        """Create shift, auto-generate periods, and ensure working days exist"""
         # Convert lists to PostgreSQL array format if needed
         shift_data = shift.dict()
+        working_days_list = shift_data.get('working_days', [])
         if isinstance(shift_data.get('working_days'), list):
             shift_data['working_days'] = '{' + ','.join(map(str, shift_data['working_days'])) + '}'
         if isinstance(shift_data.get('break_after_periods'), list):
@@ -544,6 +547,20 @@ class ShiftService:
         periods = ShiftService._generate_periods_for_shift(db_shift)
         for period in periods:
             db.add(period)
+        
+        # Auto-create working days that don't already exist
+        day_names = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+        if working_days_list:
+            existing_day_numbers = {
+                d.day_number for d in db.query(models.Day.day_number).all()
+            }
+            for day_index in working_days_list:
+                if day_index not in existing_day_numbers:
+                    db.add(models.Day(
+                        name=day_names[day_index],
+                        day_number=day_index,
+                        is_working_day=True,
+                    ))
         
         db.commit()
         db.refresh(db_shift)
@@ -566,6 +583,7 @@ class ShiftService:
         
         # Check if period-affecting fields changed
         shift_dict = shift.dict(exclude_unset=True)
+        working_days_list = shift_dict.get('working_days', [])
         regenerate_periods = (
             shift_dict.get('start_time') != db_shift.start_time or
             shift_dict.get('end_time') != db_shift.end_time or
@@ -598,6 +616,20 @@ class ShiftService:
             periods = ShiftService._generate_periods_for_shift(db_shift)
             for period in periods:
                 db.add(period)
+        
+        # Auto-create working days that don't already exist
+        day_names = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+        if working_days_list:
+            existing_day_numbers = {
+                d.day_number for d in db.query(models.Day.day_number).all()
+            }
+            for day_index in working_days_list:
+                if day_index not in existing_day_numbers:
+                    db.add(models.Day(
+                        name=day_names[day_index],
+                        day_number=day_index,
+                        is_working_day=True,
+                    ))
         
         db.commit()
         db.refresh(db_shift)
