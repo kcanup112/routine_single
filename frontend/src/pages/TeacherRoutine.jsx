@@ -14,6 +14,8 @@ import {
   IconButton,
   Autocomplete,
   Button,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material'
 import { 
   Fullscreen as FullscreenIcon,
@@ -31,6 +33,8 @@ import {
 } from '../services'
 
 export default function TeacherRoutine() {
+  const theme = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
   const [teachers, setTeachers] = useState([])
   const [departments, setDepartments] = useState([])
   const [days, setDays] = useState([])
@@ -40,6 +44,7 @@ export default function TeacherRoutine() {
   const [loading, setLoading] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [totalLoad, setTotalLoad] = useState(0)
+  const [mobileShowAllDays, setMobileShowAllDays] = useState(false)
 
   // Load initial data
   useEffect(() => {
@@ -879,6 +884,203 @@ export default function TeacherRoutine() {
     }
   }
 
+  // Determine today's day name
+  const todayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][new Date().getDay()]
+
+  const renderMobileRoutine = () => {
+    const visibleDays = mobileShowAllDays
+      ? days
+      : days.filter(d => d.name.toLowerCase() === todayName.toLowerCase())
+
+    const todayInDays = days.some(d => d.name.toLowerCase() === todayName.toLowerCase())
+
+    return (
+      <Box sx={{ mt: 1 }}>
+        {/* Day filter toggle */}
+        <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+          <Button
+            size="small"
+            variant={!mobileShowAllDays ? 'contained' : 'outlined'}
+            onClick={() => setMobileShowAllDays(false)}
+            sx={{
+              flex: 1,
+              borderRadius: '20px',
+              textTransform: 'none',
+              fontWeight: 600,
+              fontSize: '0.8rem',
+              ...(!mobileShowAllDays ? {
+                bgcolor: '#2d6a6f',
+                color: 'white',
+                '&:hover': { bgcolor: '#235558' },
+              } : {
+                borderColor: '#2d6a6f',
+                color: '#2d6a6f',
+              }),
+            }}
+          >
+            Today ({todayName})
+          </Button>
+          <Button
+            size="small"
+            variant={mobileShowAllDays ? 'contained' : 'outlined'}
+            onClick={() => setMobileShowAllDays(true)}
+            sx={{
+              flex: 1,
+              borderRadius: '20px',
+              textTransform: 'none',
+              fontWeight: 600,
+              fontSize: '0.8rem',
+              ...(mobileShowAllDays ? {
+                bgcolor: '#2d6a6f',
+                color: 'white',
+                '&:hover': { bgcolor: '#235558' },
+              } : {
+                borderColor: '#2d6a6f',
+                color: '#2d6a6f',
+              }),
+            }}
+          >
+            All Days
+          </Button>
+        </Box>
+
+        {/* No schedule message for today */}
+        {!mobileShowAllDays && !todayInDays && (
+          <Paper elevation={0} sx={{ p: 3, textAlign: 'center', border: '1px solid #e8edf2', borderRadius: '12px' }}>
+            <Typography variant="body2" sx={{ color: '#8896a4' }}>
+              No schedule configured for {todayName}.
+            </Typography>
+          </Paper>
+        )}
+
+        {visibleDays.map((day) => {
+          const isToday = day.name.toLowerCase() === todayName.toLowerCase()
+          return (
+            <Paper
+              key={day.id}
+              elevation={0}
+              sx={{ mb: 2, border: `1px solid ${isToday ? '#2d6a6f' : '#e8edf2'}`, borderRadius: '12px', overflow: 'hidden' }}
+            >
+              {/* Day header */}
+              <Box sx={{
+                bgcolor: isToday ? '#2d6a6f' : '#f8fafc',
+                color: isToday ? 'white' : '#1a2332',
+                px: 2,
+                py: 1.25,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+              }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 700, letterSpacing: 0.5 }}>
+                  {day.name}
+                </Typography>
+                {isToday && (
+                  <Box sx={{
+                    bgcolor: 'rgba(255,255,255,0.25)',
+                    color: 'white',
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    px: 1,
+                    py: 0.2,
+                    borderRadius: '10px',
+                    letterSpacing: 0.5,
+                  }}>
+                    TODAY
+                  </Box>
+                )}
+              </Box>
+
+              {/* Period rows */}
+              {(() => {
+                let skipCount = 0
+                return periods.map((period, periodIdx) => {
+                  if (skipCount > 0) {
+                    skipCount--
+                    return null
+                  }
+
+                  const cellData = getCellData(day.id, period.id)
+                  const hasContent = !!cellData
+
+                  // For multi-period entries, find the end time from the last spanned period
+                  let endTime = period.end_time
+                  if (cellData && cellData.num_periods > 1) {
+                    const lastPeriodIdx = Math.min(periodIdx + cellData.num_periods - 1, periods.length - 1)
+                    endTime = periods[lastPeriodIdx].end_time
+                    skipCount = cellData.num_periods - 1
+                  }
+
+                  return (
+                    <Box
+                      key={`${day.id}-${period.id}`}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        borderBottom: '1px solid #e8edf2',
+                        p: 1.5,
+                        bgcolor: hasContent && cellData?.is_lab ? '#E3F2FD' : hasContent ? '#E8F5E9' : 'inherit',
+                        '&:last-child': { borderBottom: 'none' },
+                        minHeight: 56,
+                      }}
+                    >
+                      {/* Time column */}
+                      <Box sx={{ minWidth: 72, mr: 1.5, pt: 0.25 }}>
+                        <Typography variant="caption" sx={{ fontWeight: 700, color: '#2d6a6f', display: 'block', lineHeight: 1.4 }}>
+                          {period.start_time?.substring(0, 5)}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: '#8896a4', display: 'block', lineHeight: 1.4 }}>
+                          {endTime?.substring(0, 5)}
+                        </Typography>
+                        {cellData && cellData.num_periods > 1 && (
+                          <Typography variant="caption" sx={{ color: '#bbb', display: 'block', fontSize: '0.6rem' }}>
+                            ×{cellData.num_periods} periods
+                          </Typography>
+                        )}
+                      </Box>
+
+                      {/* Content column */}
+                      <Box sx={{ flex: 1 }}>
+                        {hasContent ? (
+                          <Box>
+                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: '#1a2332' }}>
+                              {cellData.subject_name}
+                              {cellData.is_lab && ' (Lab)'}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: '#555', display: 'block' }}>
+                              [{cellData.class_name}{cellData.section ? ' - ' + cellData.section : ''}]
+                              {cellData.room_no && ` | Room: ${cellData.room_no}`}
+                            </Typography>
+                            {cellData.role && (
+                              <Typography variant="caption" sx={{ color: cellData.role === 'Lead' ? '#2d6a6f' : '#e67e22', fontWeight: 600, display: 'block' }}>
+                                {cellData.role} Teacher
+                              </Typography>
+                            )}
+                            {cellData.partner_ids && cellData.partner_ids.length > 0 && (
+                              <Typography variant="caption" sx={{ color: '#8896a4', display: 'block' }}>
+                                With: {getPartnerNames(cellData.partner_ids)}
+                              </Typography>
+                            )}
+                            {cellData.programme_code && (
+                              <Typography variant="caption" sx={{ color: '#8896a4', display: 'block' }}>
+                                {cellData.programme_code}{cellData.semester_name ? ` / ${cellData.semester_name}` : ''}
+                              </Typography>
+                            )}
+                          </Box>
+                        ) : (
+                          <Typography variant="body2" sx={{ color: '#ccc', fontStyle: 'italic' }}>Free</Typography>
+                        )}
+                      </Box>
+                    </Box>
+                  )
+                })
+              })()}
+            </Paper>
+          )
+        })}
+      </Box>
+    )
+  }
+
   return (
     <Box>
       {/* Page Header */}
@@ -891,7 +1093,7 @@ export default function TeacherRoutine() {
 
       {/* Teacher Selection */}
       <Paper elevation={0} sx={{ p: 2.5, mb: 3, border: '1px solid #e8edf2', borderRadius: '16px', backgroundColor: '#f8fafc' }}>
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: isMobile ? 'stretch' : 'center', flexWrap: 'wrap', flexDirection: isMobile ? 'column' : 'row' }}>
           <Autocomplete
             options={teachers}
             getOptionLabel={(option) => {
@@ -903,6 +1105,7 @@ export default function TeacherRoutine() {
             value={selectedTeacher}
             onChange={(event, newValue) => setSelectedTeacher(newValue)}
             isOptionEqualToValue={(option, value) => option.id === value.id}
+            disablePortal
             renderInput={(params) => (
               <TextField
                 {...params}
@@ -912,29 +1115,33 @@ export default function TeacherRoutine() {
                 sx={{ '& .MuiOutlinedInput-root': { borderRadius: '10px', backgroundColor: '#ffffff' } }}
               />
             )}
-            sx={{ minWidth: 340, flex: 1 }}
+            sx={{ minWidth: isMobile ? 'auto' : 340, flex: 1, width: isMobile ? '100%' : 'auto' }}
           />
           
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={handleRefresh}
-            sx={{ borderRadius: '10px', px: 2.5, textTransform: 'none', fontWeight: 600, borderColor: '#e8edf2', color: '#8896a4', '&:hover': { borderColor: '#2d6a6f', color: '#2d6a6f', backgroundColor: '#2d6a6f10' } }}
-          >
-            Refresh
-          </Button>
-          
-          <Button
-            variant="outlined"
-            startIcon={<ExportIcon />}
-            onClick={handleExportAllTeachers}
-            sx={{ borderRadius: '10px', px: 2.5, textTransform: 'none', fontWeight: 600, borderColor: '#e8edf2', color: '#2d6a6f', '&:hover': { borderColor: '#2d6a6f', backgroundColor: '#2d6a6f10' } }}
-          >
-            Export All Teachers
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            <Button
+              variant="outlined"
+              startIcon={<RefreshIcon />}
+              onClick={handleRefresh}
+              sx={{ borderRadius: '10px', px: 2.5, textTransform: 'none', fontWeight: 600, borderColor: '#e8edf2', color: '#8896a4', '&:hover': { borderColor: '#2d6a6f', color: '#2d6a6f', backgroundColor: '#2d6a6f10' }, flex: isMobile ? 1 : 'none' }}
+            >
+              Refresh
+            </Button>
+            
+            {!isMobile && (
+              <Button
+                variant="outlined"
+                startIcon={<ExportIcon />}
+                onClick={handleExportAllTeachers}
+                sx={{ borderRadius: '10px', px: 2.5, textTransform: 'none', fontWeight: 600, borderColor: '#e8edf2', color: '#2d6a6f', '&:hover': { borderColor: '#2d6a6f', backgroundColor: '#2d6a6f10' } }}
+              >
+                Export All Teachers
+              </Button>
+            )}
+          </Box>
           
           {selectedTeacher && (
-            <>
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', width: isMobile ? '100%' : 'auto' }}>
               <Box 
                 sx={{ 
                   bgcolor: '#2d6a6f', 
@@ -945,6 +1152,8 @@ export default function TeacherRoutine() {
                   display: 'flex',
                   alignItems: 'center',
                   gap: 1,
+                  flex: isMobile ? 1 : 'none',
+                  justifyContent: isMobile ? 'center' : 'flex-start',
                 }}
               >
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -955,15 +1164,17 @@ export default function TeacherRoutine() {
                 </Typography>
               </Box>
 
-              <Button
-                variant="contained"
-                startIcon={<ExportIcon />}
-                onClick={handleExportTeacherRoutine}
-                sx={{ borderRadius: '10px', px: 2.5, textTransform: 'none', fontWeight: 600, backgroundColor: '#2d6a6f', boxShadow: 'none', '&:hover': { backgroundColor: '#235558', boxShadow: 'none' } }}
-              >
-                Export to Excel
-              </Button>
-            </>
+              {!isMobile && (
+                <Button
+                  variant="contained"
+                  startIcon={<ExportIcon />}
+                  onClick={handleExportTeacherRoutine}
+                  sx={{ borderRadius: '10px', px: 2.5, textTransform: 'none', fontWeight: 600, backgroundColor: '#2d6a6f', boxShadow: 'none', '&:hover': { backgroundColor: '#235558', boxShadow: 'none' } }}
+                >
+                  Export to Excel
+                </Button>
+              )}
+            </Box>
           )}
         </Box>
       </Paper>
@@ -971,49 +1182,55 @@ export default function TeacherRoutine() {
       {/* Routine Table */}
       {selectedTeacher && (
         <Box sx={{ 
-          mt: 3,
-          position: isFullscreen ? 'fixed' : 'relative',
-          top: isFullscreen ? 0 : 'auto',
-          left: isFullscreen ? 0 : 'auto',
-          right: isFullscreen ? 0 : 'auto',
-          bottom: isFullscreen ? 0 : 'auto',
-          zIndex: isFullscreen ? 1300 : 'auto',
-          bgcolor: isFullscreen ? 'white' : 'transparent',
+          mt: isMobile ? 1 : 3,
+          ...(!isMobile && isFullscreen ? {
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 1300,
+            bgcolor: 'white',
+          } : {}),
         }}>
-          <Box sx={{ 
-            bgcolor: '#2d6a6f', 
-            color: 'white', 
-            p: 2, 
-            mb: 0,
-            borderRadius: isFullscreen ? 0 : '12px 12px 0 0',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}>
-            <Typography variant="h6">
-              ROUTINE for Teacher: {getTeacherName()}
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-              {loading && (
-                <Typography variant="body2">
-                  Loading routine...
-                </Typography>
-              )}
-              <IconButton 
-                color="inherit"
-                onClick={() => setIsFullscreen(!isFullscreen)}
-                title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
-                size="small"
-              >
-                {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
-              </IconButton>
+          {!isMobile && (
+            <Box sx={{ 
+              bgcolor: '#2d6a6f', 
+              color: 'white', 
+              p: 2, 
+              mb: 0,
+              borderRadius: isFullscreen ? 0 : '12px 12px 0 0',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+            }}>
+              <Typography variant="h6">
+                ROUTINE for Teacher: {getTeacherName()}
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                {loading && (
+                  <Typography variant="body2">
+                    Loading routine...
+                  </Typography>
+                )}
+                <IconButton 
+                  color="inherit"
+                  onClick={() => setIsFullscreen(!isFullscreen)}
+                  title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+                  size="small"
+                >
+                  {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+                </IconButton>
             </Box>
           </Box>
+          )}
 
           {loading ? (
             <Box sx={{ p: 4, textAlign: 'center' }}>
               <Typography>Loading routine data...</Typography>
             </Box>
+          ) : isMobile ? (
+            renderMobileRoutine()
           ) : (
             <TableContainer 
               component={Paper} 

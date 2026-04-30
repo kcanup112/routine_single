@@ -7,6 +7,7 @@ import { ProtectedRoute } from './components/ProtectedRoute'
 import Layout from './components/Layout'
 import { lazy, Suspense } from 'react'
 import { CircularProgress, Box } from '@mui/material'
+import ReloadPrompt from './components/ReloadPrompt'
 
 // Lazy-loaded pages
 const LandingPage = lazy(() => import('./pages/LandingPage'))
@@ -140,6 +141,7 @@ function App() {
           </Routes>
           </Suspense>
         </Router>
+        <ReloadPrompt />
       </AuthProvider>
     </ThemeProvider>
   )
