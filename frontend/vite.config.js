@@ -40,6 +40,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,jpg,svg,woff2}'],
+        importScripts: ['/sw-push.js'],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -60,7 +61,7 @@ export default defineConfig({
             },
           },
           {
-            urlPattern: /\/(api|auth|departments|programmes|semesters|classes|teachers|subjects|schedules|rooms|days|shifts|periods|teacher-subjects|semester|class-routines|finance)\/.*/i,
+            urlPattern: /\/(api|auth|departments|programmes|semesters|classes|teachers|subjects|schedules|rooms|days|shifts|periods|teacher-subjects|semester|class-routines|finance|notifications)\/.*/i,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-cache',
@@ -71,7 +72,7 @@ export default defineConfig({
           },
         ],
         navigateFallback: 'index.html',
-        navigateFallbackDenylist: [/^\/(api|auth|departments|programmes|semesters|classes|teachers|subjects|schedules|rooms|days|shifts|periods)\/.*/],
+        navigateFallbackDenylist: [/^\/(api|auth|departments|programmes|semesters|classes|teachers|subjects|schedules|rooms|days|shifts|periods|notifications)\/.*/],
       },
     }),
   ],
@@ -152,6 +153,10 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/finance': {
+        target: API_TARGET,
+        changeOrigin: true,
+      },
+      '/notifications': {
         target: API_TARGET,
         changeOrigin: true,
       },

@@ -52,7 +52,8 @@ async def global_exception_handler(request: Request, exc: Exception):
 from app.api.routes import (
     departments, teachers, subjects, schedules, programmes, 
     semesters, semester_subjects, classes, rooms, days, 
-    periods, teacher_subjects, class_routines, auth, users, calendar, shifts, finance
+    periods, teacher_subjects, class_routines, auth, users, calendar, shifts, finance,
+    notifications, email
 )
 
 app.include_router(auth.router, prefix="")
@@ -73,6 +74,8 @@ app.include_router(teacher_subjects.router, prefix="")
 app.include_router(class_routines.router, prefix="")
 app.include_router(calendar.router, prefix="/api/calendar", tags=["calendar"])
 app.include_router(finance.router, prefix="/finance", tags=["finance"])
+app.include_router(notifications.router, prefix="")
+app.include_router(email.router, prefix="")
 
 @app.get("/")
 def root():

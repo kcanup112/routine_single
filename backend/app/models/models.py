@@ -341,3 +341,29 @@ class CalendarEvent(Base):
     
     class_ = relationship("Class", back_populates="calendar_events")
     teacher = relationship("Teacher")
+
+
+class PushSubscription(Base):
+    """Web Push API subscriptions for push notifications"""
+    __tablename__ = "push_subscriptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    endpoint = Column(Text, unique=True, nullable=False, index=True)
+    p256dh = Column(Text, nullable=False)
+    auth = Column(String(255), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+
+    user = relationship("User")
+
+
+class InAppNotification(Base):
+    """In-app notifications — works over HTTP without Push API"""
+    __tablename__ = "in_app_notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(255), nullable=False)
+    body = Column(Text)
+    url = Column(String(500))
+    tag = Column(String(100))
+    created_at = Column(DateTime, server_default=func.now(), index=True)

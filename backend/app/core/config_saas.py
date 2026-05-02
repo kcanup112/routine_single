@@ -38,6 +38,17 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     FROM_EMAIL: str = "noreply@yourapp.com"
     
+    # Resend
+    RESEND_API_KEY: str = ""
+    
+    # SMTP2GO
+    MAIL_API_KEY: str = ""
+    
+    # Web Push (VAPID)
+    VAPID_PUBLIC_KEY: str = ""
+    VAPID_PRIVATE_KEY: str = ""
+    VAPID_CLAIM_EMAIL: str = "mailto:admin@kec.edu.np"
+    
     @property
     def cors_origins(self) -> List[str]:
         """Parse ALLOWED_ORIGINS as list"""

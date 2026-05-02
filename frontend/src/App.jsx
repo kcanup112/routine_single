@@ -32,6 +32,7 @@ const UserManagement = lazy(() => import('./pages/UserManagement'))
 const AcademicCalendar = lazy(() => import('./pages/AcademicCalendar'))
 const AcademicHierarchy = lazy(() => import('./pages/AcademicHierarchy'))
 const ChangePassword = lazy(() => import('./pages/ChangePassword'))
+const BroadcastNotice = lazy(() => import('./pages/BroadcastNotice'))
 
 const PageLoader = () => (
   <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
@@ -135,6 +136,11 @@ function App() {
               <Route path="users" element={
                 <ProtectedRoute roles={['admin']}>
                   <UserManagement />
+                </ProtectedRoute>
+              } />
+              <Route path="broadcast" element={
+                <ProtectedRoute roles={['admin']}>
+                  <BroadcastNotice />
                 </ProtectedRoute>
               } />
             </Route>

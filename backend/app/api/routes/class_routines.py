@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.core.database_saas import get_db
 from app.services.crud import ClassRoutineService, RoutineGeneratorService
+from app.services.notification_service import send_push_to_all
 from app.auth.dependencies import require_read_access, require_write_access
-from app.models.models import User
+from app.models.models import User, Class as ClassModel
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/class-routines", tags=["class-routines"])
@@ -52,10 +53,18 @@ class GenerateRequest(BaseModel):
     assignments: List[ClassAssignment]
 
 @router.post("/save/")
-def save_routine(request: RoutineSaveRequest, db: Session = Depends(get_db), current_user: User = Depends(require_write_access)):
+def save_routine(request: RoutineSaveRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(require_write_access)):
     """Save or update routine for a class"""
     try:
         entries = ClassRoutineService.save_routine(db, request.class_id, request.entries, request.room_no)
+        # Push notification
+        cls = db.query(ClassModel).filter(ClassModel.id == request.class_id).first()
+        class_name = cls.name if cls else f"Class #{request.class_id}"
+        background_tasks.add_task(
+            send_push_to_all, "Routine Updated",
+            f"Class routine updated for {class_name}",
+            "/dashboard/class-routine", "routine-change",
+        )
         return {"message": "Routine saved successfully", "count": len(entries)}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -73,10 +82,17 @@ def get_routine_by_class(class_id: int, db: Session = Depends(get_db), current_u
     return routine
 
 @router.delete("/{class_id}/")
-def delete_routine(class_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_write_access)):
+def delete_routine(class_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: User = Depends(require_write_access)):
     """Delete routine for a specific class"""
+    cls = db.query(ClassModel).filter(ClassModel.id == class_id).first()
+    class_name = cls.name if cls else f"Class #{class_id}"
     success = ClassRoutineService.delete_routine(db, class_id)
     if success:
+        background_tasks.add_task(
+            send_push_to_all, "Routine Deleted",
+            f"Class routine deleted for {class_name}",
+            "/dashboard/class-routine", "routine-change",
+        )
         return {"message": "Routine deleted successfully"}
     raise HTTPException(status_code=404, detail="Routine not found")
 
@@ -95,6 +111,7 @@ def check_teacher_conflict(
 @router.post("/generate/")
 def generate_routine(
     request: GenerateRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_write_access),
     solver: str = "cpsat",
@@ -113,6 +130,12 @@ def generate_routine(
     try:
         result = RoutineGeneratorService.generate(
             db, [a.dict() for a in request.assignments], solver=solver
+        )
+        num_classes = len(request.assignments)
+        background_tasks.add_task(
+            send_push_to_all, "Routines Generated",
+            f"Routines auto-generated for {num_classes} class(es)",
+            "/dashboard/class-routine", "routine-change",
         )
         return result
     except Exception as e:

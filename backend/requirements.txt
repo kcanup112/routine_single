@@ -26,6 +26,10 @@ hiredis==2.2.3
 
 # Email
 aiosmtplib==3.0.1
+resend>=2.0.0
+
+# Excel generation
+openpyxl>=3.1.0
 
 # HTTP Client
 httpx==0.25.2
@@ -33,6 +37,9 @@ aiohttp==3.9.1
 
 # Scheduling / Optimisation
 ortools>=9.11
+
+# Push Notifications
+pywebpush==2.0.1
 
 # Utilities
 python-slugify==8.0.1

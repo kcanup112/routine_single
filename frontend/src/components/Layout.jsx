@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useNavigate, Outlet } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import NotificationBell from './NotificationBell'
 import {
   AppBar,
   Box,
@@ -55,6 +56,7 @@ import {
   Business,
   MeetingRoom as RoomIcon,
   AccountTree as HierarchyIcon,
+  Campaign as BroadcastIcon,
 } from '@mui/icons-material'
 
 const drawerWidth = 240
@@ -162,23 +164,9 @@ export default function Layout() {
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
         }}>
-          📚 {'Routine'}
+          {'\u{1F4DA}'} {'Routine'}
         </Typography>
-        <IconButton 
-          size="small" 
-          onClick={handleToggleSidebar}
-          title="Hide Sidebar"
-          sx={{ 
-            bgcolor: '#f1f5f9',
-            color: '#64748b',
-            '&:hover': {
-              bgcolor: '#e2e8f0',
-              color: '#6366f1',
-            },
-          }}
-        >
-          <HideIcon fontSize="small" />
-        </IconButton>
+
       </Toolbar>
       
       <List sx={{ px: 1, py: 2 }}>
@@ -393,6 +381,27 @@ export default function Layout() {
                     />
                   </ListItemButton>
                 </ListItem>
+
+                <ListItem disablePadding sx={{ mb: 0.5 }}>
+                  <ListItemButton 
+                    onClick={() => handleNavigation('/dashboard/broadcast')}
+                    sx={{ 
+                      borderRadius: 2,
+                      py: 1.5,
+                      '&:hover': {
+                        bgcolor: 'rgba(99, 102, 241, 0.08)',
+                      },
+                    }}
+                  >
+                    <ListItemIcon sx={{ color: '#6366f1', minWidth: 40 }}>
+                      <BroadcastIcon />
+                    </ListItemIcon>
+                    <ListItemText 
+                      primary="Send Notice" 
+                      primaryTypographyProps={{ fontWeight: 600, color: '#6366f1', fontSize: '0.9375rem' }}
+                    />
+                  </ListItemButton>
+                </ListItem>
               </>
             )}
           </>
@@ -446,6 +455,7 @@ export default function Layout() {
       >
         <Toolbar>
           <IconButton
+            size="small"
             color="inherit"
             aria-label="open drawer"
             edge="start"
@@ -461,9 +471,10 @@ export default function Layout() {
               },
             }}
           >
-            {sidebarVisible ? <HideIcon /> : <ShowIcon />}
+            <MenuIcon fontSize="small" />
           </IconButton>
           <IconButton
+            size="small"
             color="inherit"
             aria-label="open drawer"
             edge="start"
@@ -478,7 +489,7 @@ export default function Layout() {
               },
             }}
           >
-            <MenuIcon />
+            <MenuIcon fontSize="small" />
           </IconButton>
           
           {/* KEC Logo */}
@@ -503,12 +514,13 @@ export default function Layout() {
           <Box sx={{ flexGrow: 1 }} />
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Typography variant="body2" sx={{ color: '#64748b', fontWeight: 500 }}>
-              Academic Year 2025
+              Academic Year {new Date().getFullYear()}
             </Typography>
             
             {/* Show user info and menu for authenticated users */}
             {isAuthenticated ? (
               <>
+                <NotificationBell />
                 <Chip
                   label={user?.role?.toUpperCase()}
                   size="small"

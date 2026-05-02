@@ -22,7 +22,9 @@ import {
   FullscreenExit as FullscreenExitIcon,
   FileDownload as ExportIcon,
   Refresh as RefreshIcon,
+  Email as EmailIcon,
 } from '@mui/icons-material'
+import { Snackbar, Alert, CircularProgress } from '@mui/material'
 import * as XLSX from 'xlsx-js-style'
 import { 
   teacherService,
@@ -31,6 +33,7 @@ import {
   classRoutineService,
   departmentService,
 } from '../services'
+import api from '../services/api'
 
 export default function TeacherRoutine() {
   const theme = useTheme()
@@ -45,6 +48,8 @@ export default function TeacherRoutine() {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [totalLoad, setTotalLoad] = useState(0)
   const [mobileShowAllDays, setMobileShowAllDays] = useState(false)
+  const [emailSending, setEmailSending] = useState(false)
+  const [emailSnackbar, setEmailSnackbar] = useState({ open: false, message: '', severity: 'success' })
 
   // Load initial data
   useEffect(() => {
@@ -884,6 +889,30 @@ export default function TeacherRoutine() {
     }
   }
 
+  const handleSendMailToAll = async () => {
+    if (teachers.length === 0) {
+      setEmailSnackbar({ open: true, message: 'No teachers available', severity: 'warning' })
+      return
+    }
+    const teachersWithEmail = teachers.filter(t => t.email)
+    if (teachersWithEmail.length === 0) {
+      setEmailSnackbar({ open: true, message: 'No teachers have email addresses', severity: 'warning' })
+      return
+    }
+    if (!window.confirm(`Send routine email with attached Excel to ${teachersWithEmail.length} teacher(s)?`)) return
+
+    setEmailSending(true)
+    try {
+      const res = await api.post('/api/email/send-routines-to-teachers', {})
+      const data = res.data
+      setEmailSnackbar({ open: true, message: `Email sent to ${data.sent} teacher(s)${data.failed > 0 ? `, ${data.failed} failed` : ''}`, severity: data.failed > 0 ? 'warning' : 'success' })
+    } catch (err) {
+      setEmailSnackbar({ open: true, message: err.response?.data?.detail || 'Failed to send emails', severity: 'error' })
+    } finally {
+      setEmailSending(false)
+    }
+  }
+
   // Determine today's day name
   const todayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][new Date().getDay()]
 
@@ -1106,6 +1135,7 @@ export default function TeacherRoutine() {
             onChange={(event, newValue) => setSelectedTeacher(newValue)}
             isOptionEqualToValue={(option, value) => option.id === value.id}
             disablePortal
+            ListboxProps={{ style: { maxHeight: 200 } }}
             renderInput={(params) => (
               <TextField
                 {...params}
@@ -1129,14 +1159,25 @@ export default function TeacherRoutine() {
             </Button>
             
             {!isMobile && (
-              <Button
-                variant="outlined"
-                startIcon={<ExportIcon />}
-                onClick={handleExportAllTeachers}
-                sx={{ borderRadius: '10px', px: 2.5, textTransform: 'none', fontWeight: 600, borderColor: '#e8edf2', color: '#2d6a6f', '&:hover': { borderColor: '#2d6a6f', backgroundColor: '#2d6a6f10' } }}
-              >
-                Export All Teachers
-              </Button>
+              <>
+                <Button
+                  variant="contained"
+                  startIcon={emailSending ? <CircularProgress size={18} color="inherit" /> : <EmailIcon />}
+                  onClick={handleSendMailToAll}
+                  disabled={emailSending}
+                  sx={{ borderRadius: '10px', px: 2.5, textTransform: 'none', fontWeight: 600, backgroundColor: '#e67e22', boxShadow: 'none', '&:hover': { backgroundColor: '#d35400', boxShadow: 'none' } }}
+                >
+                  {emailSending ? 'Sending...' : 'Send Mail to All'}
+                </Button>
+                <Button
+                  variant="outlined"
+                  startIcon={<ExportIcon />}
+                  onClick={handleExportAllTeachers}
+                  sx={{ borderRadius: '10px', px: 2.5, textTransform: 'none', fontWeight: 600, borderColor: '#e8edf2', color: '#2d6a6f', '&:hover': { borderColor: '#2d6a6f', backgroundColor: '#2d6a6f10' } }}
+                >
+                  Export All Teachers
+                </Button>
+              </>
             )}
           </Box>
           
@@ -1335,6 +1376,12 @@ export default function TeacherRoutine() {
           )}
         </Box>
       )}
+
+      <Snackbar open={emailSnackbar.open} autoHideDuration={5000} onClose={() => setEmailSnackbar({ ...emailSnackbar, open: false })} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
+        <Alert onClose={() => setEmailSnackbar({ ...emailSnackbar, open: false })} severity={emailSnackbar.severity} sx={{ width: '100%' }}>
+          {emailSnackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   )
 }

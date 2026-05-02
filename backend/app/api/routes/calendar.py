@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import date
@@ -7,6 +7,7 @@ from app.models.models import CalendarEvent
 from app.models.models import User
 from app.schemas.calendar_schemas import CalendarEvent as CalendarEventSchema, CalendarEventCreate, CalendarEventUpdate
 from app.auth.dependencies import require_read_access, require_write_access
+from app.services.notification_service import send_push_to_all
 
 router = APIRouter()
 
@@ -47,6 +48,7 @@ def get_calendar_event(
 @router.post("/", response_model=CalendarEventSchema)
 def create_calendar_event(
     event: CalendarEventCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_write_access)
 ):
@@ -55,6 +57,11 @@ def create_calendar_event(
     db.add(db_event)
     db.commit()
     db.refresh(db_event)
+    background_tasks.add_task(
+        send_push_to_all, "New Calendar Event",
+        f"{db_event.title} — {db_event.start_date}",
+        "/dashboard/calendar", "calendar-event",
+    )
     return db_event
 
 # Admin only - update events
@@ -62,6 +69,7 @@ def create_calendar_event(
 def update_calendar_event(
     event_id: int,
     event_update: CalendarEventUpdate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_write_access)
 ):
@@ -76,12 +84,18 @@ def update_calendar_event(
     
     db.commit()
     db.refresh(db_event)
+    background_tasks.add_task(
+        send_push_to_all, "Calendar Event Updated",
+        f"{db_event.title} has been updated",
+        "/dashboard/calendar", "calendar-event",
+    )
     return db_event
 
 # Admin only - delete events
 @router.delete("/{event_id}")
 def delete_calendar_event(
     event_id: int,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_write_access)
 ):
@@ -90,6 +104,12 @@ def delete_calendar_event(
     if not db_event:
         raise HTTPException(status_code=404, detail="Event not found")
     
+    title = db_event.title
     db.delete(db_event)
     db.commit()
+    background_tasks.add_task(
+        send_push_to_all, "Calendar Event Cancelled",
+        f"{title} has been removed",
+        "/dashboard/calendar", "calendar-event",
+    )
     return {"message": "Event deleted successfully"}

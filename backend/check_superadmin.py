@@ -11,7 +11,7 @@ from app.models.models import User
 from app.auth.password import get_password_hash, verify_password
 
 TARGET_EMAIL = "anupkc@kec.edu.np"
-TARGET_PASSWORD = "admin123"
+TARGET_PASSWORD = "kec123"
 TARGET_NAME = "Anup KC"
 TARGET_ROLE = "admin"
 
