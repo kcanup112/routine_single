@@ -146,9 +146,9 @@ export default function TeacherRoutine() {
           if (isLeadTeacher || isAssistant1 || isAssistant2 || isAssistant3) {
             const key = `${entry.day_id}-${entry.period_id}`
             
-            // Calculate load for this entry
+            // Calculate load for this entry (Theory = 1.0, Full Lab = 0.8, Half Lab = 0.4 per period)
             const periods = entry.num_periods || 1
-            const workload = entry.is_lab ? periods * 0.8 : periods * 1.0
+            const workload = entry.is_lab ? (entry.is_half_lab ? periods * 0.4 : periods * 0.8) : periods * 1.0
             calculatedLoad += workload
             
             // Get partner teachers for lab sessions
@@ -277,9 +277,9 @@ export default function TeacherRoutine() {
             if (isLeadTeacher || isAssistant1 || isAssistant2 || isAssistant3) {
               const key = `${entry.day_id}-${entry.period_id}`
               
-              // Calculate load for this entry
+              // Calculate load for this entry (Theory = 1.0, Full Lab = 0.8, Half Lab = 0.4 per period)
               const periods = entry.num_periods || 1
-              const workload = entry.is_lab ? periods * 0.8 : periods * 1.0
+              const workload = entry.is_lab ? (entry.is_half_lab ? periods * 0.4 : periods * 0.8) : periods * 1.0
               teacherTotalLoad += workload
               
               // Get partner teachers for lab sessions
