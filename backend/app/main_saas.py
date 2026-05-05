@@ -17,7 +17,11 @@ logger = logging.getLogger(__name__)
 from app.models import models  # noqa: F401
 
 # Initialize database (creates tables if not exist, skips existing ones)
-Base.metadata.create_all(bind=engine, checkfirst=True)
+# Wrapped in try/except to handle race condition when multiple workers start simultaneously
+try:
+    Base.metadata.create_all(bind=engine, checkfirst=True)
+except Exception as e:
+    logger.warning(f"Table creation skipped (likely race condition with another worker): {e}")
 
 app = FastAPI(
     title="Routine Scheduler API",

@@ -913,6 +913,31 @@ export default function TeacherRoutine() {
     }
   }
 
+  const handleSendMailToSelected = async () => {
+    if (!selectedTeacher) {
+      setEmailSnackbar({ open: true, message: 'Please select a teacher first', severity: 'warning' })
+      return
+    }
+    if (!selectedTeacher.email) {
+      setEmailSnackbar({ open: true, message: `${selectedTeacher.name} has no email address`, severity: 'warning' })
+      return
+    }
+    if (!window.confirm(`Send routine email to ${selectedTeacher.name} (${selectedTeacher.email})?`)) return
+
+    setEmailSending(true)
+    try {
+      const res = await api.post('/api/email/send-routines-to-teachers', {
+        teacher_ids: [selectedTeacher.id]
+      })
+      const data = res.data
+      setEmailSnackbar({ open: true, message: `Email sent to ${selectedTeacher.name}`, severity: data.failed > 0 ? 'warning' : 'success' })
+    } catch (err) {
+      setEmailSnackbar({ open: true, message: err.response?.data?.detail || 'Failed to send email', severity: 'error' })
+    } finally {
+      setEmailSending(false)
+    }
+  }
+
   // Determine today's day name
   const todayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][new Date().getDay()]
 
@@ -1206,14 +1231,25 @@ export default function TeacherRoutine() {
               </Box>
 
               {!isMobile && (
-                <Button
-                  variant="contained"
-                  startIcon={<ExportIcon />}
-                  onClick={handleExportTeacherRoutine}
-                  sx={{ borderRadius: '10px', px: 2.5, textTransform: 'none', fontWeight: 600, backgroundColor: '#2d6a6f', boxShadow: 'none', '&:hover': { backgroundColor: '#235558', boxShadow: 'none' } }}
-                >
-                  Export to Excel
-                </Button>
+                <>
+                  <Button
+                    variant="contained"
+                    startIcon={emailSending ? <CircularProgress size={18} color="inherit" /> : <EmailIcon />}
+                    onClick={handleSendMailToSelected}
+                    disabled={emailSending}
+                    sx={{ borderRadius: '10px', px: 2.5, textTransform: 'none', fontWeight: 600, backgroundColor: '#e67e22', boxShadow: 'none', '&:hover': { backgroundColor: '#d35400', boxShadow: 'none' } }}
+                  >
+                    {emailSending ? 'Sending...' : 'Send Mail'}
+                  </Button>
+                  <Button
+                    variant="contained"
+                    startIcon={<ExportIcon />}
+                    onClick={handleExportTeacherRoutine}
+                    sx={{ borderRadius: '10px', px: 2.5, textTransform: 'none', fontWeight: 600, backgroundColor: '#2d6a6f', boxShadow: 'none', '&:hover': { backgroundColor: '#235558', boxShadow: 'none' } }}
+                  >
+                    Export to Excel
+                  </Button>
+                </>
               )}
             </Box>
           )}

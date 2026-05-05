@@ -137,6 +137,7 @@ export default function ClassRoutine() {
   })
   
   const [routineData, setRoutineData] = useState({})
+  const isLoadingRoutine = useRef(false) // true while data is being loaded from server (not a user edit)
   const [loading, setLoading] = useState(false)
   const [subjectSlotCounts, setSubjectSlotCounts] = useState({}) // Track remaining slots for each subject
 
@@ -344,6 +345,12 @@ export default function ClassRoutine() {
 
     // Skip auto-save if routineData is empty (initial state or cleared)
     if (Object.keys(routineData).length === 0) {
+      return
+    }
+
+    // Skip auto-save when data was just loaded from the server (not a user edit)
+    if (isLoadingRoutine.current) {
+      isLoadingRoutine.current = false
       return
     }
 
@@ -586,6 +593,12 @@ export default function ClassRoutine() {
               is_half_lab: entry.is_half_lab,
               num_periods: entry.num_periods,
             }
+          } else {
+            // Use the maximum num_periods across all lab subjects in the group
+            labGroups[entry.lab_group_id].num_periods = Math.max(
+              labGroups[entry.lab_group_id].num_periods || 1,
+              entry.num_periods || 1
+            )
           }
           labGroups[entry.lab_group_id].lab_subjects.push({
             subject_id: entry.subject_id,
@@ -618,12 +631,13 @@ export default function ClassRoutine() {
           // Multi-subject lab
           const labGroup = labGroups[entry.lab_group_id]
           console.log(`Creating multi-subject lab at ${baseKey}:`, labGroup.lab_subjects)
+          const maxNumPeriods = Math.max(...labGroup.lab_subjects.map(ls => ls.num_periods || 1))
           newRoutineData[baseKey] = {
             subject_id: entry.subject_id, // Store first subject as primary
             subject_name: entry.subject_name,
             is_lab: true,
             is_half_lab: entry.is_half_lab,
-            num_periods: entry.num_periods,
+            num_periods: maxNumPeriods,
             lead_teacher_id: entry.lead_teacher_id,
             lead_teacher_name: entry.lead_teacher_name,
             assist_teacher_1_id: entry.assist_teacher_1_id,
@@ -654,10 +668,11 @@ export default function ClassRoutine() {
         }
         
         // Create continuation cells for multi-period assignments
-        if (entry.num_periods > 1 && activePeriods.length > 0) {
+        const cellNumPeriods = newRoutineData[baseKey]?.num_periods || entry.num_periods
+        if (cellNumPeriods > 1 && activePeriods.length > 0) {
           const startPeriodIndex = activePeriods.findIndex(p => p.id === entry.periodId)
           if (startPeriodIndex !== -1) {
-            for (let i = 1; i < entry.num_periods; i++) {
+            for (let i = 1; i < cellNumPeriods; i++) {
               if (startPeriodIndex + i < activePeriods.length) {
                 const nextPeriod = activePeriods[startPeriodIndex + i]
                 const contKey = `${entry.dayId}-${nextPeriod.id}`
@@ -671,6 +686,7 @@ export default function ClassRoutine() {
         }
       })
       
+      isLoadingRoutine.current = true
       setRoutineData(newRoutineData)
       console.log('Routine loaded successfully:', newRoutineData)
     } catch (error) {
@@ -729,7 +745,7 @@ export default function ClassRoutine() {
               subject_id: labSubject.subject_id,
               is_lab: true,
               is_half_lab: labSubject.is_half_lab || false,
-              num_periods: value.num_periods || 1,
+              num_periods: labSubject.num_periods || value.num_periods || 1,
               lead_teacher_id: labSubject.lead_teacher_id || null,
               assist_teacher_1_id: labSubject.assist_teacher_1_id || null,
               assist_teacher_2_id: labSubject.assist_teacher_2_id || null,

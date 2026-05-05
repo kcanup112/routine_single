@@ -434,17 +434,17 @@ export default function Schedules() {
         <Table size="small">
           <TableHead>
             <TableRow sx={{ bgcolor: 'primary.main' }}>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>SN</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Teacher</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Subject</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold', textAlign: 'center' }}>T/P</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold', textAlign: 'center' }}>#Period</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold', textAlign: 'center' }}>Workload</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold', textAlign: 'center' }}>Total Workload</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold', textAlign: 'center' }}>Effective Load</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold', textAlign: 'center' }}>Extra Load</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Position</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold', textAlign: 'right' }}>Total Payment</TableCell>
+              <TableCell sx={{ color: 'black', fontWeight: 'bold' }}>SN</TableCell>
+              <TableCell sx={{ color: 'black', fontWeight: 'bold' }}>Teacher</TableCell>
+              <TableCell sx={{ color: 'black', fontWeight: 'bold' }}>Subject</TableCell>
+              <TableCell sx={{ color: 'black', fontWeight: 'bold', textAlign: 'center' }}>T/P</TableCell>
+              <TableCell sx={{ color: 'black', fontWeight: 'bold', textAlign: 'center' }}>#Period</TableCell>
+              <TableCell sx={{ color: 'black', fontWeight: 'bold', textAlign: 'center' }}>Workload</TableCell>
+              <TableCell sx={{ color: 'black', fontWeight: 'bold', textAlign: 'center' }}>Total Workload</TableCell>
+              <TableCell sx={{ color: 'black', fontWeight: 'bold', textAlign: 'center' }}>Effective Load</TableCell>
+              <TableCell sx={{ color: 'black', fontWeight: 'bold', textAlign: 'center' }}>Extra Load</TableCell>
+              <TableCell sx={{ color: 'black', fontWeight: 'bold' }}>Position</TableCell>
+              <TableCell sx={{ color: 'black', fontWeight: 'bold', textAlign: 'right' }}>Total Payment</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>

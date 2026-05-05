@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     
     # SMTP2GO
     MAIL_API_KEY: str = ""
+    SENDER_EMAIL: str = "no-reply@kec.edu.np"
     
     # Web Push (VAPID)
     VAPID_PUBLIC_KEY: str = ""

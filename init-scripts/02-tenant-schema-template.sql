@@ -414,6 +414,30 @@ INSERT INTO days (name, day_number, is_working_day) VALUES
     ('Saturday', 6, false)
 ON CONFLICT (day_number) DO NOTHING;
 
+-- Push Subscriptions (Web Push API)
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    endpoint TEXT UNIQUE NOT NULL,
+    p256dh TEXT NOT NULL,
+    auth VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_push_subscriptions_endpoint ON push_subscriptions(endpoint);
+
+-- In-App Notifications
+CREATE TABLE IF NOT EXISTS in_app_notifications (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    body TEXT,
+    url VARCHAR(500),
+    tag VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_in_app_notifications_created_at ON in_app_notifications(created_at);
+
 COMMENT ON TABLE shifts IS 'Different shifts (Morning, Day, Evening) with their timing and period configuration';
 COMMENT ON TABLE periods IS 'Auto-generated periods based on shift configuration';
 COMMENT ON TABLE class_period_overrides IS 'Custom period timings for specific classes when they differ from shift defaults';

@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/email", tags=["email"])
 
 SMTP2GO_API_URL = "https://api.smtp2go.com/v3/email/send"
-SENDER_EMAIL = "anupkc@kec.edu.np"
+SENDER_EMAIL = settings.SENDER_EMAIL
 
 
 def _send_via_smtp2go(to_email: str, subject: str, html_body: str, attachments: list = None):
