@@ -178,7 +178,7 @@ export default function TeacherRoutine() {
               subject_code: entry.subject?.code || '',
               class_name: entry.class?.name || 'N/A',
               section: entry.class?.section || '',
-              room_no: entry.class?.room_no || '',
+              room_no: entry.is_lab && entry.lab_room ? entry.lab_room : (entry.class?.room_no || ''),
               is_lab: entry.is_lab,
               num_periods: entry.num_periods,
               role: isLeadTeacher ? 'Lead' : 'Assistant',
@@ -309,7 +309,7 @@ export default function TeacherRoutine() {
                 class_name: entry.class?.name || 'N/A',
                 section: entry.class?.section || '',
                 is_lab: entry.is_lab,
-                room_no: entry.class?.room_no || '',
+                room_no: entry.is_lab && entry.lab_room ? entry.lab_room : (entry.class?.room_no || ''),
                 num_periods: entry.num_periods || 1,
                 partner_ids: partners,
               }

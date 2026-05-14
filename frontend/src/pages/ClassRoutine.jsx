@@ -1366,8 +1366,8 @@ export default function ClassRoutine() {
                 }
                 
                 if (cellData.is_lab) {
-                  if (cellData.room_no) {
-                    cellContent += `\nRoom: ${cellData.room_no}`
+                  if (cellData.lab_room) {
+                    cellContent += `\nRoom: ${cellData.lab_room}`
                   }
                   if (cellData.group) {
                     cellContent += `\nGroup: ${cellData.group}`
@@ -1738,8 +1738,8 @@ export default function ClassRoutine() {
                     if (cellData.group) {
                       cellContent += ` (${cellData.group})`
                     }
-                    if (cellData.room_no) {
-                      cellContent += `(Lab:${cellData.room_no})`
+                    if (cellData.lab_room) {
+                      cellContent += `(Lab:${cellData.lab_room})`
                     }
                   }
                 }

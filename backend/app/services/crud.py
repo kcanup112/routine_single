@@ -939,6 +939,7 @@ class ClassRoutineService:
                             'id': class_info.id,
                             'name': class_info.name,
                             'section': class_info.section,
+                            'room_no': class_info.room_no,
                             'programme': programme_dict,
                             'semester': semester_dict,
                         }

@@ -105,7 +105,7 @@ def _build_teacher_routine_map(entries, teacher_id, all_teachers):
             "code": subj.code if subj else "",
             "class_name": cls.name if cls else "N/A",
             "section": cls.section if cls else "",
-            "room_no": cls.room_no if cls else "",
+            "room_no": e.lab_room if e.is_lab and e.lab_room else (cls.room_no if cls else ""),
             "is_lab": e.is_lab,
             "num_periods": periods,
             "role": "Lead" if is_lead else "Assistant",
