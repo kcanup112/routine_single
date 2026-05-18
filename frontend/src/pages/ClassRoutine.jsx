@@ -228,7 +228,8 @@ export default function ClassRoutine() {
     severity: 'success',
   })
 
-  const [autoSaveTimeout, setAutoSaveTimeout] = useState(null)
+  const autoSaveTimeoutRef = useRef(null)
+  const isSaving = useRef(false)
 
   // Load saved effective date from localStorage on mount
   useEffect(() => {
@@ -355,8 +356,8 @@ export default function ClassRoutine() {
     }
 
     // Clear any existing timeout
-    if (autoSaveTimeout) {
-      clearTimeout(autoSaveTimeout)
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current)
     }
 
     // Set a new timeout to save after 2 seconds of no changes (debounce)
@@ -364,7 +365,7 @@ export default function ClassRoutine() {
       autoSaveRoutine()
     }, 2000)
 
-    setAutoSaveTimeout(timeout)
+    autoSaveTimeoutRef.current = timeout
 
     // Cleanup timeout on unmount
     return () => {
@@ -402,7 +403,9 @@ export default function ClassRoutine() {
 
   const autoSaveRoutine = async () => {
     if (!formData.class_id) return
+    if (isSaving.current) return // Prevent concurrent saves
 
+    isSaving.current = true
     try {
       console.log('Auto-saving routine...')
       
@@ -488,6 +491,8 @@ export default function ClassRoutine() {
         message: 'Auto-save failed',
         severity: 'error',
       })
+    } finally {
+      isSaving.current = false
     }
   }
 
@@ -707,6 +712,15 @@ export default function ClassRoutine() {
       return
     }
 
+    // Cancel pending auto-save to prevent duplicate requests
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current)
+      autoSaveTimeoutRef.current = null
+    }
+
+    if (isSaving.current) return // Prevent concurrent saves
+    isSaving.current = true
+
     try {
       console.log('Saving routine for class:', formData.class_id)
       console.log('Current routineData:', routineData)
@@ -795,6 +809,8 @@ export default function ClassRoutine() {
         message: 'Failed to save routine. Please try again.',
         severity: 'error',
       })
+    } finally {
+      isSaving.current = false
     }
   }
 
@@ -822,9 +838,7 @@ export default function ClassRoutine() {
     const wsData = []
 
     // Row 1: Institution Name (centered, merged)
-    const user = JSON.parse(localStorage.getItem('user') || '{}')
-    const institutionName = 'Institution'
-    wsData.push([institutionName])
+    wsData.push(['Kantipur Engineering College'])
     
     // Row 2: Class Routine (centered)
     wsData.push(['Class Routine'])
@@ -1284,9 +1298,7 @@ export default function ClassRoutine() {
         const roomNumber = classItem.room_no || 'N/A'
 
         // Header rows
-        const user = JSON.parse(localStorage.getItem('user') || '{}')
-        const institutionName = 'Institution'
-        wsData.push([institutionName])
+        wsData.push(['Kantipur Engineering College'])
         wsData.push(['Class Routine'])
         
         const row3 = new Array(periods.length + 1).fill('')
@@ -2731,8 +2743,20 @@ export default function ClassRoutine() {
     console.log('5. lab_subjects array:', newRoutineData[key].lab_subjects)
     console.log('=== END SAVE DEBUG ===')
     
-    // Create continuation cells for the maximum period range
+    // Clear old continuation cells before creating new ones
     const currentPeriodIndex = periods.findIndex(p => p.id === periodId)
+    const existingAssignment = routineData[key]
+    if (existingAssignment && existingAssignment.num_periods > 1) {
+      for (let i = 1; i < existingAssignment.num_periods; i++) {
+        if (currentPeriodIndex + i < periods.length) {
+          const nextPeriod = periods[currentPeriodIndex + i]
+          const oldKey = `${dayId}-${nextPeriod.id}`
+          delete newRoutineData[oldKey]
+        }
+      }
+    }
+    
+    // Create continuation cells for the maximum period range
     for (let i = 1; i < maxNumPeriods; i++) {
       if (currentPeriodIndex + i < periods.length) {
         const nextPeriod = periods[currentPeriodIndex + i]

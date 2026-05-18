@@ -819,13 +819,27 @@ class ClassRoutineService:
             models.ClassRoutineEntry.class_id == class_id
         ).delete()
         
-        # Create new entries
-        created_entries = []
+        # Deduplicate entries by (day_id, period_id, subject_id, group) to prevent
+        # duplicate lab entries from concurrent save requests
+        seen = set()
+        unique_entries = []
         for entry_data in routine_entries:
-            # Skip continuation entries (they're handled by num_periods)
             if entry_data.get('isContinuation'):
                 continue
-                
+            dedup_key = (
+                entry_data.get('dayId'),
+                entry_data.get('periodId'),
+                entry_data.get('subject_id'),
+                entry_data.get('group'),
+            )
+            if dedup_key in seen:
+                continue
+            seen.add(dedup_key)
+            unique_entries.append(entry_data)
+        
+        # Create new entries
+        created_entries = []
+        for entry_data in unique_entries:
             entry = models.ClassRoutineEntry(
                 class_id=class_id,
                 day_id=entry_data['dayId'],
